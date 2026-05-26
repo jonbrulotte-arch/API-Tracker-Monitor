@@ -74,9 +74,26 @@ export function AccessTokenSettings() {
 
   const handleCopy = async () => {
     if (!newToken) return;
-    await navigator.clipboard.writeText(newToken);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(newToken);
+      } else {
+        // Fallback for non-HTTPS / LAN access
+        const el = document.createElement("textarea");
+        el.value = newToken;
+        el.style.position = "fixed";
+        el.style.opacity = "0";
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Copy failed silently — token is visible on screen
+    }
   };
 
   const toggleScope = (scope: string) => {
