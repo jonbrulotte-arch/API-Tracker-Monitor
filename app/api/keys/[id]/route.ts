@@ -35,31 +35,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id } = await params;
-  const body = await req.json();
-  const parsed = updateKeySchema.safeParse(body);
+  try {
+    const { id } = await params;
+    const body = await req.json();
+    const parsed = updateKeySchema.safeParse(body);
 
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const { value, expiresAt, tags, ...rest } = parsed.data;
+    const key = await db.apiKey.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(value ? { encryptedValue: encrypt(value) } : {}),
+        ...(expiresAt !== undefined ? { expiresAt: expiresAt ? new Date(expiresAt) : null } : {}),
+        ...(tags !== undefined ? { tags: JSON.stringify(tags) } : {}),
+      },
+      include: {
+        createdBy: { select: { id: true, name: true, email: true } },
+        monitorConfig: true,
+        monitorResults: { orderBy: { checkedAt: "desc" }, take: 20 },
+      },
+    });
+
+    return NextResponse.json(key);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const { value, expiresAt, tags, ...rest } = parsed.data;
-  const key = await db.apiKey.update({
-    where: { id },
-    data: {
-      ...rest,
-      ...(value ? { encryptedValue: encrypt(value) } : {}),
-      ...(expiresAt !== undefined ? { expiresAt: expiresAt ? new Date(expiresAt) : null } : {}),
-      ...(tags !== undefined ? { tags: JSON.stringify(tags) } : {}),
-    },
-    include: {
-      createdBy: { select: { id: true, name: true, email: true } },
-      monitorConfig: true,
-      monitorResults: { orderBy: { checkedAt: "desc" }, take: 20 },
-    },
-  });
-
-  return NextResponse.json(key);
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

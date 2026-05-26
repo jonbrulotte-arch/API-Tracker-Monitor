@@ -298,15 +298,29 @@ export function KeyForm({ initialData }: KeyFormProps) {
       }
 
       if (!res.ok) {
-        const data = await res.json();
-        setError(typeof data.error === "string" ? data.error : "Validation failed");
+        let message = `Request failed (${res.status})`;
+        const raw = await res.text().catch(() => "");
+        try {
+          const data = JSON.parse(raw);
+          if (typeof data.error === "string") {
+            message = data.error;
+          } else if (data.error && typeof data.error === "object") {
+            const fieldErrors = Object.entries(data.error as Record<string, unknown>)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+              .join("; ");
+            message = fieldErrors || "Validation failed";
+          }
+        } catch {
+          if (raw && !raw.includes("<!DOCTYPE")) message = raw.slice(0, 200);
+        }
+        setError(message);
         return;
       }
 
       router.push("/keys");
       router.refresh();
-    } catch {
-      setError("An unexpected error occurred");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
