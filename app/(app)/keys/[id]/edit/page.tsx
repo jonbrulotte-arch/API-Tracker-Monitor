@@ -7,7 +7,10 @@ export const dynamic = "force-dynamic";
 
 export default async function EditKeyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const key = await db.apiKey.findUnique({ where: { id } });
+  const key = await db.apiKey.findUnique({
+    where: { id },
+    include: { monitorConfig: true },
+  });
   if (!key) notFound();
 
   return (
@@ -22,6 +25,7 @@ export default async function EditKeyPage({ params }: { params: Promise<{ id: st
             expiresAt: key.expiresAt,
             tags: key.tags,
             notes: key.notes,
+            monitorConfig: key.monitorConfig,
           }}
         />
       </div>
