@@ -30,8 +30,10 @@ export function AccessTokenSettings() {
   const [formExpiry, setFormExpiry] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [origin, setOrigin] = useState("https://your-app.com");
 
   useEffect(() => {
+    setOrigin(window.location.origin);
     fetch("/api/access-tokens")
       .then((r) => r.json())
       .then(setTokens);
@@ -246,7 +248,7 @@ export function AccessTokenSettings() {
       <div className="mt-4 pt-4 border-t border-[#1e2535]">
         <p className="text-xs font-medium text-[#8892a4] mb-2">Usage Example</p>
         <pre className="text-[11px] font-mono text-[#8892a4] bg-[#0f1117] rounded p-3 overflow-x-auto">
-          {`# Fetch a single key by name\ncurl -H "Authorization: Bearer atm_..." \\\n  ${typeof window !== "undefined" ? window.location.origin : "https://your-app.com"}/api/v1/keys/OpenAI%20Production\n\n# List all keys\ncurl -H "Authorization: Bearer atm_..." \\\n  ${typeof window !== "undefined" ? window.location.origin : "https://your-app.com"}/api/v1/keys?reveal=true`}
+          {`# Fetch a single key by name\ncurl -H "Authorization: Bearer atm_..." \\\n  ${origin}/api/v1/keys/OpenAI%20Production\n\n# List all keys\ncurl -H "Authorization: Bearer atm_..." \\\n  ${origin}/api/v1/keys?reveal=true`}
         </pre>
       </div>
     </Card>
