@@ -295,10 +295,26 @@ function KeyReveal({ keyId }: { keyId: string }) {
     await doReveal();
   };
 
+  const copyToClipboard = (text: string) => {
+    if (navigator?.clipboard?.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    // Fallback for non-HTTPS contexts
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand("copy");
+    document.body.removeChild(el);
+    return Promise.resolve();
+  };
+
   const handleContextMenu = (e: React.MouseEvent) => {
     if (!value) return;
     e.preventDefault();
-    navigator.clipboard.writeText(value).then(() => {
+    copyToClipboard(value).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
