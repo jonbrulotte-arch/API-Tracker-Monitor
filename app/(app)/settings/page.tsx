@@ -24,7 +24,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col flex-1">
       <Topbar title="Settings" description="Account and team configuration" />
-      <div className="flex-1 p-6 space-y-5 max-w-2xl">
+      <div className={`flex-1 p-6 space-y-5 ${isAdmin ? "max-w-5xl" : "max-w-2xl"}`}>
 
         {/* Profile — name, email, password */}
         <ProfileSettings
