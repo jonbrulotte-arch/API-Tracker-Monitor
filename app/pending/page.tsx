@@ -37,7 +37,7 @@ export default function PendingPage() {
           </div>
 
           <button
-            onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
+            onClick={async () => { await signOut({ redirect: false }); window.location.href = "/login"; }}
             className="flex items-center gap-2 mx-auto text-sm text-[#8892a4] hover:text-red-400 transition-colors"
           >
             <LogOut className="h-4 w-4" />
