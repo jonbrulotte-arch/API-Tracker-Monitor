@@ -6,14 +6,13 @@ import { sendSlackNotification } from "@/lib/notifications";
 
 const ALL_KEYS = [
   "slack_webhook_url", "notify_on_failure", "notify_on_expiry",
-  "expiry_warning_days", "notify_on_key_add", "notify_on_key_remove",
+  "notify_on_key_add", "notify_on_key_remove",
 ];
 
 const webhookSchema = z.object({
   webhookUrl: z.string().url().optional().nullable(),
   notifyOnFailure: z.boolean().optional(),
   notifyOnExpiry: z.boolean().optional(),
-  expiryWarningDays: z.number().int().min(1).max(90).optional(),
   notifyOnKeyAdd: z.boolean().optional(),
   notifyOnKeyRemove: z.boolean().optional(),
 });
@@ -38,7 +37,6 @@ export async function GET() {
     webhookUrl: r["slack_webhook_url"] ?? "",
     notifyOnFailure: r["notify_on_failure"] !== "false",
     notifyOnExpiry: r["notify_on_expiry"] !== "false",
-    expiryWarningDays: Number(r["expiry_warning_days"] ?? 14),
     notifyOnKeyAdd: r["notify_on_key_add"] !== "false",
     notifyOnKeyRemove: r["notify_on_key_remove"] !== "false",
   });
@@ -56,13 +54,12 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { webhookUrl, notifyOnFailure, notifyOnExpiry, expiryWarningDays, notifyOnKeyAdd, notifyOnKeyRemove } = parsed.data;
+  const { webhookUrl, notifyOnFailure, notifyOnExpiry, notifyOnKeyAdd, notifyOnKeyRemove } = parsed.data;
 
   const ops = [
     ...(webhookUrl !== undefined ? [upsertSetting("slack_webhook_url", webhookUrl ?? "")] : []),
     ...(notifyOnFailure !== undefined ? [upsertSetting("notify_on_failure", String(notifyOnFailure))] : []),
     ...(notifyOnExpiry !== undefined ? [upsertSetting("notify_on_expiry", String(notifyOnExpiry))] : []),
-    ...(expiryWarningDays !== undefined ? [upsertSetting("expiry_warning_days", String(expiryWarningDays))] : []),
     ...(notifyOnKeyAdd !== undefined ? [upsertSetting("notify_on_key_add", String(notifyOnKeyAdd))] : []),
     ...(notifyOnKeyRemove !== undefined ? [upsertSetting("notify_on_key_remove", String(notifyOnKeyRemove))] : []),
   ];

@@ -10,6 +10,7 @@ import { TeamSettings } from "@/components/settings/team-settings";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { AppNameSettings } from "@/components/settings/app-name-settings";
 import { AdminTokenSettings } from "@/components/settings/admin-token-settings";
+import { NotificationSettings } from "@/components/settings/notification-settings";
 import { getAppName } from "@/lib/app-config";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,9 @@ export default async function SettingsPage() {
 
         {/* All team access tokens — admin only */}
         {isAdmin && <AdminTokenSettings />}
+
+        {/* Global notification settings — admin only */}
+        {isAdmin && <NotificationSettings />}
 
         {/* Slack notifications — admin only */}
         {isAdmin && <SlackSettings />}

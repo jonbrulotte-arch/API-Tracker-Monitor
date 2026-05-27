@@ -35,7 +35,6 @@ export function SlackSettings() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [notifyOnFailure, setNotifyOnFailure] = useState(true);
   const [notifyOnExpiry, setNotifyOnExpiry] = useState(true);
-  const [expiryWarningDays, setExpiryWarningDays] = useState(14);
   const [notifyOnKeyAdd, setNotifyOnKeyAdd] = useState(true);
   const [notifyOnKeyRemove, setNotifyOnKeyRemove] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,7 +53,6 @@ export function SlackSettings() {
         setWebhookUrl(data.webhookUrl ?? "");
         setNotifyOnFailure(data.notifyOnFailure ?? true);
         setNotifyOnExpiry(data.notifyOnExpiry ?? true);
-        setExpiryWarningDays(data.expiryWarningDays ?? 14);
         setNotifyOnKeyAdd(data.notifyOnKeyAdd ?? true);
         setNotifyOnKeyRemove(data.notifyOnKeyRemove ?? true);
       });
@@ -84,7 +82,7 @@ export function SlackSettings() {
       const res = await fetch("/api/notifications/slack", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ webhookUrl, notifyOnFailure, notifyOnExpiry, expiryWarningDays, notifyOnKeyAdd, notifyOnKeyRemove }),
+        body: JSON.stringify({ webhookUrl, notifyOnFailure, notifyOnExpiry, notifyOnKeyAdd, notifyOnKeyRemove }),
       });
       if (res.ok) setStatus({ type: "success", message: "Settings saved." });
       else setStatus({ type: "error", message: "Failed to save settings." });
@@ -204,21 +202,6 @@ export function SlackSettings() {
             <span className="text-sm text-[#e8eaf0]">API key is removed</span>
           </label>
         </div>
-
-        {notifyOnExpiry && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-[#c8cdd6]">Warn</span>
-            <input
-              type="number"
-              min={1}
-              max={90}
-              value={expiryWarningDays}
-              onChange={(e) => setExpiryWarningDays(Number(e.target.value))}
-              className="w-16 h-9 rounded-md border border-[#2a3447] bg-[#0f1117] px-3 text-sm text-[#e8eaf0] text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-sm text-[#c8cdd6]">days before expiry</span>
-          </div>
-        )}
 
         {status && (
           <div className={`rounded-md px-3 py-2 text-sm border ${
