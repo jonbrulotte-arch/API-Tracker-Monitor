@@ -83,14 +83,26 @@ export async function checkExpiryNotifications(now: Date = new Date()) {
   const cutoff = new Date(now.getTime() + warningDays * 24 * 60 * 60 * 1000);
 
   const expiringKeys = await db.apiKey.findMany({
-    where: {
-      expiresAt: { gte: now, lte: cutoff },
-    },
+    where: { expiresAt: { gte: now, lte: cutoff } },
     select: { name: true, provider: true, expiresAt: true },
   });
 
+  if (expiringKeys.length === 0) return;
+
+  // One query: which keys already had a successful expiry notification sent today (UTC)?
+  const todayStart = new Date(now);
+  todayStart.setUTCHours(0, 0, 0, 0);
+
+  const sentToday = await db.notificationLog.findMany({
+    where: { type: "key_expiry", sentAt: { gte: todayStart }, success: true },
+    select: { keyName: true },
+    distinct: ["keyName"],
+  });
+  const alreadyNotified = new Set(sentToday.map((r) => r.keyName));
+
   for (const key of expiringKeys) {
     if (!key.expiresAt) continue;
+    if (alreadyNotified.has(key.name)) continue; // already sent today
     const daysLeft = Math.ceil((key.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     notifyKeyExpiry(key.name, key.provider, daysLeft).catch(console.error);
   }
