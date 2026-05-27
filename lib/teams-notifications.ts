@@ -34,41 +34,20 @@ export async function sendTeamsNotification(
   const webhookUrl = await getWebhookUrl();
   if (!webhookUrl) return false;
 
-  // Adaptive Card for Teams
-  const body: object = {
-    type: "message",
-    attachments: [
+  // MessageCard format — supported by both classic connectors and Workflow webhooks
+  const body = {
+    "@type": "MessageCard",
+    "@context": "https://schema.org/extensions",
+    "themeColor": "0076D7",
+    "summary": title,
+    "sections": [
       {
-        contentType: "application/vnd.microsoft.card.adaptive",
-        content: {
-          $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
-          type: "AdaptiveCard",
-          version: "1.4",
-          body: [
-            {
-              type: "TextBlock",
-              size: "Medium",
-              weight: "Bolder",
-              text: title,
-              wrap: true,
-            },
-            ...(facts && facts.length > 0
-              ? [
-                  {
-                    type: "FactSet",
-                    facts: facts.map((f) => ({ title: f.name, value: f.value })),
-                  },
-                ]
-              : []),
-            {
-              type: "TextBlock",
-              text: text,
-              wrap: true,
-              color: "Default",
-              size: "Small",
-            },
-          ],
-        },
+        "activityTitle": `**${title}**`,
+        "activitySubtitle": text,
+        ...(facts && facts.length > 0
+          ? { facts: facts.map((f) => ({ name: f.name + ":", value: f.value })) }
+          : {}),
+        "markdown": true,
       },
     ],
   };
