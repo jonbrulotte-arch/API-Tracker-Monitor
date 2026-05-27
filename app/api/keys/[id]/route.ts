@@ -114,19 +114,18 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   if (key) {
     const actor = session.user.name ?? session.user.email;
-    await Promise.all([
-      writeAuditLog({
-        action: "deleted",
-        entityType: "api_key",
-        entityId: id,
-        entityName: key.name,
-        provider: key.provider,
-        userId: session.user.id,
-        userEmail: session.user.email,
-        userName: session.user.name,
-      }),
-      notifyKeyRemoved(key.name, key.provider, actor).catch(() => {}),
-    ]);
+    // Fire-and-forget — never block the response for audit or notifications
+    writeAuditLog({
+      action: "deleted",
+      entityType: "api_key",
+      entityId: id,
+      entityName: key.name,
+      provider: key.provider,
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userName: session.user.name,
+    }).catch(() => {});
+    notifyKeyRemoved(key.name, key.provider, actor).catch(() => {});
   }
 
   return NextResponse.json({ success: true });

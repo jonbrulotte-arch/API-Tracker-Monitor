@@ -2,24 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { verifyToken } from "@/lib/access-tokens";
 import { decrypt, maskKey } from "@/lib/crypto";
+import { logApiCall, getClientIp } from "@/lib/api-logger";
 
-/**
- * GET /api/v1/keys
- * List all keys (metadata only, no values) or include decrypted values with read:keys scope.
- *
- * Authorization: Bearer atm_<token>
- * ?reveal=true — include decrypted key values (requires read:keys scope)
- * ?provider=stripe — filter by provider (case-insensitive)
- * ?tag=production — filter by tag
- */
 export async function GET(req: NextRequest) {
+  const start = Date.now();
+  const path = "/api/v1/keys";
+  const method = "GET";
+  const ip = getClientIp(req);
+
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
+    await logApiCall({ method, path, statusCode: 401, responseMs: Date.now() - start, ipAddress: ip });
     return NextResponse.json({ error: "Missing Authorization header" }, { status: 401 });
   }
 
   const tokenResult = await verifyToken(authHeader.slice(7));
   if (!tokenResult) {
+    await logApiCall({ method, path, statusCode: 401, responseMs: Date.now() - start, ipAddress: ip });
     return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
   }
 
@@ -29,20 +28,12 @@ export async function GET(req: NextRequest) {
   const tagFilter = searchParams.get("tag")?.toLowerCase();
 
   if (reveal && !tokenResult.scopes.includes("read:keys")) {
+    await logApiCall({ method, path, tokenPrefix: tokenResult.prefix, tokenName: tokenResult.name, statusCode: 403, responseMs: Date.now() - start, ipAddress: ip });
     return NextResponse.json({ error: "Token does not have read:keys scope" }, { status: 403 });
   }
 
   const keys = await db.apiKey.findMany({
-    select: {
-      id: true,
-      name: true,
-      provider: true,
-      encryptedValue: true,
-      expiresAt: true,
-      tags: true,
-      status: true,
-      updatedAt: true,
-    },
+    select: { id: true, name: true, provider: true, encryptedValue: true, expiresAt: true, tags: true, status: true, updatedAt: true },
     orderBy: { name: "asc" },
   });
 
@@ -61,15 +52,19 @@ export async function GET(req: NextRequest) {
       try { value = decrypt(k.encryptedValue); } catch { value = undefined; }
     }
     return {
-      id: k.id,
-      name: k.name,
-      provider: k.provider,
+      id: k.id, name: k.name, provider: k.provider,
       ...(reveal ? { value } : { valueMask: maskKey("placeholder") }),
-      expiresAt: k.expiresAt,
-      tags: JSON.parse(k.tags),
-      status: k.status,
-      updatedAt: k.updatedAt,
+      expiresAt: k.expiresAt, tags: JSON.parse(k.tags), status: k.status, updatedAt: k.updatedAt,
     };
+  });
+
+  await logApiCall({
+    method, path,
+    tokenPrefix: tokenResult.prefix,
+    tokenName: tokenResult.name,
+    statusCode: 200,
+    responseMs: Date.now() - start,
+    ipAddress: ip,
   });
 
   return NextResponse.json({ keys: result, count: result.length });

@@ -2,6 +2,9 @@ import { auth } from "@/lib/auth";
 import { Topbar } from "@/components/layout/topbar";
 import { Card } from "@/components/ui/card";
 import { SlackSettings } from "@/components/settings/slack-settings";
+import { TeamsSettings } from "@/components/settings/teams-settings";
+import { EmailSettings } from "@/components/settings/email-settings";
+import { BackupSettings } from "@/components/settings/backup-settings";
 import { AccessTokenSettings } from "@/components/settings/access-token-settings";
 import { TeamSettings } from "@/components/settings/team-settings";
 import { ProfileSettings } from "@/components/settings/profile-settings";
@@ -32,6 +35,15 @@ export default async function SettingsPage() {
 
         {/* Slack notifications — admin only */}
         {isAdmin && <SlackSettings />}
+
+        {/* Microsoft Teams notifications — admin only */}
+        {isAdmin && <TeamsSettings />}
+
+        {/* Email notifications — admin only */}
+        {isAdmin && <EmailSettings />}
+
+        {/* Encrypted backups — admin only */}
+        {isAdmin && <BackupSettings />}
 
         {/* Environment info */}
         <Card>

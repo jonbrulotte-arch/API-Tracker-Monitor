@@ -76,24 +76,23 @@ export async function POST(req: NextRequest) {
     });
 
     const actor = session.user.name ?? session.user.email;
-    await Promise.all([
-      writeAuditLog({
-        action: "created",
-        entityType: "api_key",
-        entityId: key.id,
-        entityName: name,
-        provider,
-        userId: session.user.id,
-        userEmail: session.user.email,
-        userName: session.user.name,
-        details: {
-          expiresAt: expiresAt ?? null,
-          tags: tags ?? [],
-          hasMonitor: !!monitor,
-        },
-      }),
-      notifyKeyAdded(name, provider, actor).catch(() => {}),
-    ]);
+    // Fire-and-forget — never block the response for audit or notifications
+    writeAuditLog({
+      action: "created",
+      entityType: "api_key",
+      entityId: key.id,
+      entityName: name,
+      provider,
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userName: session.user.name,
+      details: {
+        expiresAt: expiresAt ?? null,
+        tags: tags ?? [],
+        hasMonitor: !!monitor,
+      },
+    }).catch(() => {});
+    notifyKeyAdded(name, provider, actor).catch(() => {});
 
     return NextResponse.json(key, { status: 201 });
   } catch (err) {

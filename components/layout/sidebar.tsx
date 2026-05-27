@@ -13,6 +13,7 @@ import {
   BookOpen,
   Code2,
   History,
+  ScrollText,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -21,6 +22,7 @@ const mainNav = [
   { href: "/keys", label: "API Keys", icon: Key },
   { href: "/monitors", label: "Monitors", icon: Activity },
   { href: "/audit", label: "Audit Log", icon: History },
+  { href: "/apilog", label: "API Log", icon: ScrollText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

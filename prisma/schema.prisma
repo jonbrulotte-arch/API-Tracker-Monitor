@@ -22,6 +22,7 @@ model User {
   sessions      Session[]
   apiKeys       ApiKey[]
   accessTokens  AccessToken[]
+  backups       Backup[]
 }
 
 model Account {
@@ -116,6 +117,22 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+model ApiLog {
+  id           String   @id @default(cuid())
+  method       String
+  path         String
+  tokenPrefix  String?
+  tokenName    String?
+  statusCode   Int
+  responseMs   Int
+  keyName      String?
+  ipAddress    String?
+  requestedAt  DateTime @default(now())
+
+  @@index([requestedAt])
+  @@index([tokenPrefix])
+}
+
 model AuditLog {
   id         String   @id @default(cuid())
   action     String
@@ -144,6 +161,33 @@ model SlackLog {
   sentAt    DateTime @default(now())
 
   @@index([sentAt])
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  channel   String   // slack | email | teams
+  type      String
+  keyName   String?
+  provider  String?
+  message   String
+  success   Boolean
+  error     String?
+  sentAt    DateTime @default(now())
+
+  @@index([sentAt])
+  @@index([channel])
+}
+
+model Backup {
+  id          String   @id @default(cuid())
+  filename    String
+  sizeBytes   Int
+  encrypted   Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy   User @relation(fields: [createdById], references: [id])
+  @@index([createdAt])
 }
 
 model AccessToken {
