@@ -82,6 +82,20 @@ export async function sendTeamsNotification(
   return success;
 }
 
+export async function teamsNotifyMonitorRecovered(keyName: string, provider: string) {
+  if (!await isEnabled("teams_notify_on_failure")) return;
+  await sendTeamsNotification(
+    "✅ Monitor Recovered",
+    `Checked at ${new Date().toUTCString()}`,
+    [
+      { name: "Key", value: keyName },
+      { name: "Provider", value: provider },
+      { name: "Status", value: "Back online" },
+    ],
+    { type: "monitor_recovered", keyName, provider }
+  );
+}
+
 export async function teamsNotifyMonitorFailure(keyName: string, provider: string, errorMessage: string, statusCode?: number | null) {
   if (!await isEnabled("teams_notify_on_failure")) return;
   await sendTeamsNotification(

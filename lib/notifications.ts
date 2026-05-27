@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { teamsNotifyMonitorFailure, teamsNotifyKeyExpiry, teamsNotifyKeyAdded, teamsNotifyKeyRemoved } from "./teams-notifications";
-import { emailNotifyMonitorFailure, emailNotifyKeyExpiry, emailNotifyKeyAdded, emailNotifyKeyRemoved } from "./email-notifications";
+import { teamsNotifyMonitorFailure, teamsNotifyMonitorRecovered, teamsNotifyKeyExpiry, teamsNotifyKeyAdded, teamsNotifyKeyRemoved } from "./teams-notifications";
+import { emailNotifyMonitorFailure, emailNotifyMonitorRecovered, emailNotifyKeyExpiry, emailNotifyKeyAdded, emailNotifyKeyRemoved } from "./email-notifications";
 
 export interface SlackNotification {
   text: string;
@@ -74,6 +74,34 @@ export async function notifyAllChannels(
     sendSlackNotification(slackPayload, logOpts),
     emailFn(),
     teamsFn(),
+  ]);
+}
+
+export async function notifyMonitorRecovered(keyName: string, provider: string) {
+  await Promise.allSettled([
+    sendSlackNotification(
+      {
+        text: `✅ Monitor recovered: *${keyName}* (${provider}) is back online`,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "✅ Monitor Recovered", emoji: true } },
+          {
+            type: "section",
+            fields: [
+              { type: "mrkdwn", text: `*Key:*\n${keyName}` },
+              { type: "mrkdwn", text: `*Provider:*\n${provider}` },
+              { type: "mrkdwn", text: `*Status:*\nBack online` },
+            ],
+          },
+          {
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `Recovered at <!date^${Math.floor(Date.now() / 1000)}^{date_short_pretty} {time}|${new Date().toISOString()}>` }],
+          },
+        ],
+      },
+      { type: "monitor_recovered", keyName, provider }
+    ),
+    teamsNotifyMonitorRecovered(keyName, provider),
+    emailNotifyMonitorRecovered(keyName, provider),
   ]);
 }
 

@@ -21,6 +21,7 @@ interface NotifLogEntry {
 
 const TYPE_LABELS: Record<string, string> = {
   monitor_failure: "Monitor Failure",
+  monitor_recovered: "Monitor Recovered",
   key_expiry: "Key Expiry",
   key_added: "Key Added",
   key_removed: "Key Removed",

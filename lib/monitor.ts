@@ -1,6 +1,6 @@
 import { decrypt } from "./crypto";
 import { db } from "./db";
-import { notifyMonitorFailure } from "./notifications";
+import { notifyMonitorFailure, notifyMonitorRecovered } from "./notifications";
 
 export interface CheckResult {
   ok: boolean;
@@ -20,6 +20,13 @@ export async function runCheck(apiKeyId: string): Promise<CheckResult> {
   }
 
   const config = apiKey.monitorConfig;
+
+  // Snapshot the last result before this check so we can detect recovery
+  const previousResult = await db.monitorResult.findFirst({
+    where: { apiKeyId },
+    orderBy: { checkedAt: "desc" },
+    select: { ok: true },
+  });
   let plainKey: string;
 
   try {
@@ -81,11 +88,14 @@ export async function runCheck(apiKeyId: string): Promise<CheckResult> {
       data: { lastCheckedAt: new Date() },
     });
 
-    // Notify on failure (fire-and-forget)
-    if (!ok) {
-      const notifySetting = await db.appSetting.findUnique({ where: { key: "notify_on_failure" } });
-      if (notifySetting?.value !== "false") {
+    // Notify on failure or recovery (fire-and-forget)
+    const notifySetting = await db.appSetting.findUnique({ where: { key: "notify_on_failure" } });
+    if (notifySetting?.value !== "false") {
+      if (!ok) {
         notifyMonitorFailure(apiKey.name, apiKey.provider, errorMsg!, response.status).catch(console.error);
+      } else if (previousResult && !previousResult.ok) {
+        // Was failing, now passing — send recovery notification
+        notifyMonitorRecovered(apiKey.name, apiKey.provider).catch(console.error);
       }
     }
 
@@ -103,8 +113,8 @@ export async function runCheck(apiKeyId: string): Promise<CheckResult> {
       data: { lastCheckedAt: new Date() },
     });
 
-    const notifySetting = await db.appSetting.findUnique({ where: { key: "notify_on_failure" } });
-    if (notifySetting?.value !== "false") {
+    const notifySetting2 = await db.appSetting.findUnique({ where: { key: "notify_on_failure" } });
+    if (notifySetting2?.value !== "false") {
       notifyMonitorFailure(apiKey.name, apiKey.provider, errorMessage).catch(console.error);
     }
 

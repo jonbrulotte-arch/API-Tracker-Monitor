@@ -101,6 +101,17 @@ function baseHtml(title: string, rows: { label: string; value: string }[], foote
 </html>`;
 }
 
+export async function emailNotifyMonitorRecovered(keyName: string, provider: string) {
+  if (!await isEnabled("email_notify_on_failure")) return;
+  const subject = `✅ Monitor Recovered: ${keyName}`;
+  const html = baseHtml("API Key Monitor Recovered", [
+    { label: "Key", value: keyName },
+    { label: "Provider", value: provider },
+    { label: "Status", value: "Back online" },
+  ], `Recovered at ${new Date().toUTCString()}`);
+  await sendEmailNotification(subject, html, { type: "monitor_recovered", keyName, provider });
+}
+
 export async function emailNotifyMonitorFailure(keyName: string, provider: string, errorMessage: string, statusCode?: number | null) {
   if (!await isEnabled("email_notify_on_failure")) return;
   const subject = `🚨 Monitor Failure: ${keyName}`;
