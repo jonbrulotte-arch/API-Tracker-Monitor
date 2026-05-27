@@ -19,6 +19,11 @@ async function logSlack(opts: {
   }
 }
 
+async function isEnabled(settingKey: string): Promise<boolean> {
+  const s = await db.appSetting.findUnique({ where: { key: settingKey } });
+  return s?.value !== "false";
+}
+
 export async function sendSlackNotification(
   payload: SlackNotification,
   logOpts?: { type: string; keyName?: string; provider?: string }
@@ -53,14 +58,12 @@ export async function sendSlackNotification(
 }
 
 export async function notifyMonitorFailure(keyName: string, provider: string, errorMessage: string, statusCode?: number | null) {
+  if (!await isEnabled("notify_on_failure")) return;
   await sendSlackNotification(
     {
       text: `*API Key Monitor Alert* — ${keyName} (${provider}) is failing`,
       blocks: [
-        {
-          type: "header",
-          text: { type: "plain_text", text: "🚨 API Key Monitor Failure", emoji: true },
-        },
+        { type: "header", text: { type: "plain_text", text: "🚨 API Key Monitor Failure", emoji: true } },
         {
           type: "section",
           fields: [
@@ -72,9 +75,7 @@ export async function notifyMonitorFailure(keyName: string, provider: string, er
         },
         {
           type: "context",
-          elements: [
-            { type: "mrkdwn", text: `Checked at <!date^${Math.floor(Date.now() / 1000)}^{date_short_pretty} {time}|${new Date().toISOString()}>` },
-          ],
+          elements: [{ type: "mrkdwn", text: `Checked at <!date^${Math.floor(Date.now() / 1000)}^{date_short_pretty} {time}|${new Date().toISOString()}>` }],
         },
       ],
     },
@@ -88,10 +89,7 @@ export async function notifyKeyExpiry(keyName: string, provider: string, daysUnt
     {
       text: `${urgency} API Key *${keyName}* (${provider}) expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}`,
       blocks: [
-        {
-          type: "header",
-          text: { type: "plain_text", text: `${urgency} API Key Expiry Warning`, emoji: true },
-        },
+        { type: "header", text: { type: "plain_text", text: `${urgency} API Key Expiry Warning`, emoji: true } },
         {
           type: "section",
           fields: [
@@ -103,5 +101,55 @@ export async function notifyKeyExpiry(keyName: string, provider: string, daysUnt
       ],
     },
     { type: "key_expiry", keyName, provider }
+  );
+}
+
+export async function notifyKeyAdded(keyName: string, provider: string, addedBy: string) {
+  if (!await isEnabled("notify_on_key_add")) return;
+  await sendSlackNotification(
+    {
+      text: `✅ New API key added: *${keyName}* (${provider})`,
+      blocks: [
+        { type: "header", text: { type: "plain_text", text: "✅ API Key Added", emoji: true } },
+        {
+          type: "section",
+          fields: [
+            { type: "mrkdwn", text: `*Key:*\n${keyName}` },
+            { type: "mrkdwn", text: `*Provider:*\n${provider}` },
+            { type: "mrkdwn", text: `*Added by:*\n${addedBy}` },
+          ],
+        },
+        {
+          type: "context",
+          elements: [{ type: "mrkdwn", text: `Added at <!date^${Math.floor(Date.now() / 1000)}^{date_short_pretty} {time}|${new Date().toISOString()}>` }],
+        },
+      ],
+    },
+    { type: "key_added", keyName, provider }
+  );
+}
+
+export async function notifyKeyRemoved(keyName: string, provider: string, removedBy: string) {
+  if (!await isEnabled("notify_on_key_remove")) return;
+  await sendSlackNotification(
+    {
+      text: `🗑️ API key removed: *${keyName}* (${provider})`,
+      blocks: [
+        { type: "header", text: { type: "plain_text", text: "🗑️ API Key Removed", emoji: true } },
+        {
+          type: "section",
+          fields: [
+            { type: "mrkdwn", text: `*Key:*\n${keyName}` },
+            { type: "mrkdwn", text: `*Provider:*\n${provider}` },
+            { type: "mrkdwn", text: `*Removed by:*\n${removedBy}` },
+          ],
+        },
+        {
+          type: "context",
+          elements: [{ type: "mrkdwn", text: `Removed at <!date^${Math.floor(Date.now() / 1000)}^{date_short_pretty} {time}|${new Date().toISOString()}>` }],
+        },
+      ],
+    },
+    { type: "key_removed", keyName, provider }
   );
 }

@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 const updateSchema = z.object({
   status: z.enum(["ACTIVE", "DISABLED", "PENDING"]).optional(),
   role: z.enum(["ADMIN", "SUB_ADMIN", "MEMBER"]).optional(),
+  name: z.string().min(1).max(100).optional(),
+  email: z.string().email().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -19,30 +21,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
 
-  const target = await db.user.findUnique({ where: { id }, select: { id: true, role: true } });
+  const target = await db.user.findUnique({ where: { id }, select: { id: true, role: true, email: true } });
   if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  // Sub-admins can only modify MEMBERs, not other admins
   if (callerRole === "SUB_ADMIN" && (target.role === "ADMIN" || target.role === "SUB_ADMIN")) {
     return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
-  // Only ADMIN can promote to SUB_ADMIN or ADMIN
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { status, role } = parsed.data;
+  const { status, role, name, email } = parsed.data;
 
   if (role && (role === "SUB_ADMIN" || role === "ADMIN") && callerRole !== "ADMIN") {
     return NextResponse.json({ error: "Only admins can promote users" }, { status: 403 });
   }
 
-  // Prevent modifying the caller's own role/status
   if (id === session.user.id && (role || status === "DISABLED")) {
-    return NextResponse.json({ error: "Cannot modify your own account this way" }, { status: 400 });
+    return NextResponse.json({ error: "Cannot modify your own role/status this way" }, { status: 400 });
+  }
+
+  if (email && email !== target.email) {
+    const conflict = await db.user.findUnique({ where: { email } });
+    if (conflict) return NextResponse.json({ error: "Email already in use" }, { status: 409 });
   }
 
   const updated = await db.user.update({
@@ -50,6 +54,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: {
       ...(status !== undefined ? { status } : {}),
       ...(role !== undefined ? { role } : {}),
+      ...(name !== undefined ? { name } : {}),
+      ...(email !== undefined ? { email } : {}),
     },
     select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
   });

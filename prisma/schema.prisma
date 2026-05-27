@@ -116,6 +116,24 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  entityName String
+  provider   String?
+  userId     String
+  userEmail  String
+  userName   String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityId])
+  @@index([createdAt])
+  @@index([userId])
+}
+
 model SlackLog {
   id        String   @id @default(cuid())
   type      String

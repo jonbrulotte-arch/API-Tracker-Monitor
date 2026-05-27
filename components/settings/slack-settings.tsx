@@ -20,7 +20,14 @@ interface SlackLogEntry {
 const TYPE_LABELS: Record<string, string> = {
   monitor_failure: "Monitor Failure",
   key_expiry: "Key Expiry",
+  key_added: "Key Added",
+  key_removed: "Key Removed",
   test: "Test",
+};
+
+const TYPE_LABELS_EXTRA: Record<string, string> = {
+  key_added: "Key Added",
+  key_removed: "Key Removed",
 };
 
 export function SlackSettings() {
@@ -28,6 +35,8 @@ export function SlackSettings() {
   const [notifyOnFailure, setNotifyOnFailure] = useState(true);
   const [notifyOnExpiry, setNotifyOnExpiry] = useState(true);
   const [expiryWarningDays, setExpiryWarningDays] = useState(14);
+  const [notifyOnKeyAdd, setNotifyOnKeyAdd] = useState(true);
+  const [notifyOnKeyRemove, setNotifyOnKeyRemove] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [forceChecking, setForceChecking] = useState(false);
@@ -45,6 +54,8 @@ export function SlackSettings() {
         setNotifyOnFailure(data.notifyOnFailure ?? true);
         setNotifyOnExpiry(data.notifyOnExpiry ?? true);
         setExpiryWarningDays(data.expiryWarningDays ?? 14);
+        setNotifyOnKeyAdd(data.notifyOnKeyAdd ?? true);
+        setNotifyOnKeyRemove(data.notifyOnKeyRemove ?? true);
       });
   }, []);
 
@@ -72,7 +83,7 @@ export function SlackSettings() {
       const res = await fetch("/api/notifications/slack", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ webhookUrl, notifyOnFailure, notifyOnExpiry, expiryWarningDays }),
+        body: JSON.stringify({ webhookUrl, notifyOnFailure, notifyOnExpiry, expiryWarningDays, notifyOnKeyAdd, notifyOnKeyRemove }),
       });
       if (res.ok) setStatus({ type: "success", message: "Settings saved." });
       else setStatus({ type: "error", message: "Failed to save settings." });
@@ -162,6 +173,34 @@ export function SlackSettings() {
               }`} />
             </button>
             <span className="text-sm text-[#e8eaf0]">API key is expiring soon</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button
+              type="button"
+              onClick={() => setNotifyOnKeyAdd(!notifyOnKeyAdd)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                notifyOnKeyAdd ? "bg-blue-600" : "bg-[#2a3447]"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                notifyOnKeyAdd ? "translate-x-4.5" : "translate-x-0.5"
+              }`} />
+            </button>
+            <span className="text-sm text-[#e8eaf0]">API key is added</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button
+              type="button"
+              onClick={() => setNotifyOnKeyRemove(!notifyOnKeyRemove)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                notifyOnKeyRemove ? "bg-blue-600" : "bg-[#2a3447]"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                notifyOnKeyRemove ? "translate-x-4.5" : "translate-x-0.5"
+              }`} />
+            </button>
+            <span className="text-sm text-[#e8eaf0]">API key is removed</span>
           </label>
         </div>
 

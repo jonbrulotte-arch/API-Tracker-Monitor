@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Check, Ban, ChevronDown } from "lucide-react";
+import { Users, Check, Ban, ChevronDown, Pencil, X } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 interface TeamUser {
@@ -37,6 +37,9 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
   const [users, setUsers] = useState<TeamUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
 
   const isAdmin = currentUserRole === "ADMIN";
 
@@ -48,7 +51,7 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  const update = async (userId: string, patch: { status?: string; role?: string }) => {
+  const update = async (userId: string, patch: { status?: string; role?: string; name?: string; email?: string }) => {
     setUpdating(userId);
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
@@ -63,6 +66,17 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
     } finally {
       setUpdating(null);
     }
+  };
+
+  const startEdit = (u: TeamUser) => {
+    setEditing(u.id);
+    setEditName(u.name ?? "");
+    setEditEmail(u.email);
+  };
+
+  const saveEdit = async (userId: string) => {
+    await update(userId, { name: editName, email: editEmail });
+    setEditing(null);
   };
 
   const pendingCount = users.filter((u) => u.status === "PENDING").length;
@@ -90,7 +104,31 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
             );
 
             return (
-              <div key={u.id} className="flex items-center justify-between py-3 gap-3">
+              <div key={u.id} className="py-3 space-y-2">
+                {editing === u.id ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      className="h-7 rounded border border-[#2a3447] bg-[#0f1117] px-2 text-xs text-[#e8eaf0] focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Name"
+                    />
+                    <input
+                      className="h-7 rounded border border-[#2a3447] bg-[#0f1117] px-2 text-xs text-[#e8eaf0] focus:outline-none focus:ring-1 focus:ring-blue-500 w-44"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="Email"
+                      type="email"
+                    />
+                    <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => saveEdit(u.id)}>
+                      <Check className="h-3 w-3 text-green-400" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm text-[#e8eaf0] truncate">{u.name ?? u.email}</p>
@@ -108,54 +146,39 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
                     {u.role}
                   </Badge>
 
-                  {canModify && (
-                    <div className="flex items-center gap-1">
-                      {u.status === "PENDING" && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          loading={updating === u.id}
-                          onClick={() => update(u.id, { status: "ACTIVE" })}
-                          title="Approve"
-                        >
-                          <Check className="h-3.5 w-3.5 text-green-400" />
-                          <span className="text-xs">Approve</span>
-                        </Button>
-                      )}
-                      {u.status === "ACTIVE" && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          loading={updating === u.id}
-                          onClick={() => update(u.id, { status: "DISABLED" })}
-                          title="Disable"
-                        >
-                          <Ban className="h-3.5 w-3.5 text-red-400" />
-                          <span className="text-xs">Disable</span>
-                        </Button>
-                      )}
-                      {u.status === "DISABLED" && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          loading={updating === u.id}
-                          onClick={() => update(u.id, { status: "ACTIVE" })}
-                          title="Re-enable"
-                        >
-                          <Check className="h-3.5 w-3.5 text-green-400" />
-                          <span className="text-xs">Enable</span>
-                        </Button>
-                      )}
-
-                      {isAdmin && u.role !== "ADMIN" && (
-                        <RoleMenu
-                          currentRole={u.role}
-                          onSelect={(role) => update(u.id, { role })}
-                          disabled={updating === u.id}
-                        />
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {isAdmin && editing !== u.id && (
+                      <Button size="sm" variant="ghost" onClick={() => startEdit(u)} title="Edit name/email">
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {canModify && (
+                      <>
+                        {u.status === "PENDING" && (
+                          <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "ACTIVE" })}>
+                            <Check className="h-3.5 w-3.5 text-green-400" />
+                            <span className="text-xs">Approve</span>
+                          </Button>
+                        )}
+                        {u.status === "ACTIVE" && (
+                          <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "DISABLED" })}>
+                            <Ban className="h-3.5 w-3.5 text-red-400" />
+                            <span className="text-xs">Disable</span>
+                          </Button>
+                        )}
+                        {u.status === "DISABLED" && (
+                          <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "ACTIVE" })}>
+                            <Check className="h-3.5 w-3.5 text-green-400" />
+                            <span className="text-xs">Enable</span>
+                          </Button>
+                        )}
+                        {isAdmin && u.role !== "ADMIN" && (
+                          <RoleMenu currentRole={u.role} onSelect={(role) => update(u.id, { role })} disabled={updating === u.id} />
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
                 </div>
               </div>
             );

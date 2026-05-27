@@ -3,6 +3,8 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
+import { writeAuditLog } from "@/lib/audit";
+import { notifyKeyAdded } from "@/lib/notifications";
 
 const monitorSchema = z.object({
   endpoint: z.string().url(),
@@ -50,10 +52,7 @@ export async function POST(req: NextRequest) {
     const parsed = createKeySchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.flatten().fieldErrors },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
     const { name, provider, value, expiresAt, tags, notes, monitor } = parsed.data;
@@ -67,13 +66,7 @@ export async function POST(req: NextRequest) {
         tags: JSON.stringify(tags ?? []),
         notes,
         createdById: session.user.id,
-        ...(monitor
-          ? {
-              monitorConfig: {
-                create: monitor,
-              },
-            }
-          : {}),
+        ...(monitor ? { monitorConfig: { create: monitor } } : {}),
       },
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
@@ -81,6 +74,26 @@ export async function POST(req: NextRequest) {
         monitorResults: { take: 0 },
       },
     });
+
+    const actor = session.user.name ?? session.user.email;
+    await Promise.all([
+      writeAuditLog({
+        action: "created",
+        entityType: "api_key",
+        entityId: key.id,
+        entityName: name,
+        provider,
+        userId: session.user.id,
+        userEmail: session.user.email,
+        userName: session.user.name,
+        details: {
+          expiresAt: expiresAt ?? null,
+          tags: tags ?? [],
+          hasMonitor: !!monitor,
+        },
+      }),
+      notifyKeyAdded(name, provider, actor).catch(() => {}),
+    ]);
 
     return NextResponse.json(key, { status: 201 });
   } catch (err) {
