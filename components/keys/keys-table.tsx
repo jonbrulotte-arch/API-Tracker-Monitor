@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatRelative, getExpiryStatus, formatMs } from "@/lib/utils";
-import { Edit, Trash2, Eye, Activity, ChevronDown, ChevronUp } from "lucide-react";
+import { Edit, Trash2, Eye, Activity, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ApiKeyWithRelations } from "@/types";
 
@@ -204,13 +204,76 @@ function Th({
   );
 }
 
+function PasswordModal({ onConfirm, onCancel }: { onConfirm: (pw: string) => void; onCancel: () => void }) {
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChecking(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        onConfirm(pw);
+      } else {
+        setError("Incorrect password.");
+        setPw("");
+        inputRef.current?.focus();
+      }
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onCancel}>
+      <div className="bg-[#0f1117] border border-[#2a3447] rounded-lg p-5 w-80 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-4">
+          <Lock className="h-4 w-4 text-[#8892a4]" />
+          <h3 className="text-sm font-semibold text-[#e8eaf0]">Confirm your password</h3>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <input
+            ref={inputRef}
+            type="password"
+            placeholder="Enter your password"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            className="h-9 w-full rounded-md border border-[#2a3447] bg-[#0d1018] px-3 text-sm text-[#e8eaf0] placeholder:text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs text-[#8892a4] hover:text-[#e8eaf0] transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={!pw || checking} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-md transition-colors">
+              {checking ? "Checking…" : "Confirm"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function KeyReveal({ keyId }: { keyId: string }) {
   const [value, setValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const reveal = async () => {
-    if (value) { setVisible(!visible); return; }
+  const doReveal = async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/keys/${keyId}/reveal`);
@@ -222,26 +285,55 @@ function KeyReveal({ keyId }: { keyId: string }) {
     }
   };
 
+  const handleRevealClick = () => {
+    if (value) { setVisible(!visible); return; }
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordConfirm = async () => {
+    setShowPasswordModal(false);
+    await doReveal();
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (!value) return;
+    e.preventDefault();
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+    fetch(`/api/keys/${keyId}/copy`, { method: "POST" }).catch(() => {});
+  };
+
   if (!visible || !value) {
     return (
-      <button
-        onClick={reveal}
-        disabled={loading}
-        className="inline-flex items-center gap-1 text-xs text-[#4a5568] hover:text-[#8892a4] transition-colors font-mono"
-      >
-        <Eye className="h-3 w-3" />
-        {loading ? "..." : "••••••••"}
-      </button>
+      <>
+        {showPasswordModal && (
+          <PasswordModal
+            onConfirm={handlePasswordConfirm}
+            onCancel={() => setShowPasswordModal(false)}
+          />
+        )}
+        <button
+          onClick={handleRevealClick}
+          disabled={loading}
+          className="inline-flex items-center gap-1 text-xs text-[#4a5568] hover:text-[#8892a4] transition-colors font-mono"
+        >
+          <Eye className="h-3 w-3" />
+          {loading ? "..." : "••••••••"}
+        </button>
+      </>
     );
   }
 
   return (
     <button
       onClick={() => setVisible(false)}
+      onContextMenu={handleContextMenu}
       className="font-mono text-xs text-green-400 hover:text-green-300 max-w-[180px] truncate block transition-colors"
-      title={value}
+      title={copied ? "Copied!" : value}
     >
-      {value}
+      {copied ? <span className="text-blue-400">Copied!</span> : value}
     </button>
   );
 }

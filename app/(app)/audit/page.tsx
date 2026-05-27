@@ -10,6 +10,7 @@ const ACTION_VARIANT: Record<string, "success" | "danger" | "warning" | "info" |
   updated: "info",
   deleted: "danger",
   revealed: "warning",
+  copied: "info",
 };
 
 const ACTION_LABEL: Record<string, string> = {
@@ -17,6 +18,7 @@ const ACTION_LABEL: Record<string, string> = {
   updated: "Updated",
   deleted: "Deleted",
   revealed: "Revealed",
+  copied: "Copied",
 };
 
 export default async function AuditPage() {
