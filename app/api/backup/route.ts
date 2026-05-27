@@ -1,100 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { decrypt } from "@/lib/crypto";
+import { createBackup, getBackupDir } from "@/lib/backup";
 import { z } from "zod";
 
-const MAX_BACKUPS_DEFAULT = 10;
-
-async function getMaxBackups(): Promise<number> {
-  const s = await db.appSetting.findUnique({ where: { key: "backup_max_count" } });
-  return Number(s?.value ?? MAX_BACKUPS_DEFAULT);
-}
-
-// Gather all data worth backing up
-async function collectBackupData() {
-  const [keys, settings, monitors, users] = await Promise.all([
-    db.apiKey.findMany({
-      select: {
-        id: true, name: true, provider: true, encryptedValue: true,
-        expiresAt: true, tags: true, notes: true, status: true,
-        createdAt: true, updatedAt: true, createdById: true,
-      },
-    }),
-    db.appSetting.findMany(),
-    db.monitorConfig.findMany(),
-    db.user.findMany({
-      select: {
-        id: true, name: true, email: true, role: true,
-        status: true, createdAt: true,
-      },
-    }),
-  ]);
-
-  return {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    users,
-    apiKeys: keys,
-    monitorConfigs: monitors,
-    appSettings: settings,
-  };
-}
-
-// POST — create a new backup
+// POST — create a new backup immediately
 export async function POST() {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const data = await collectBackupData();
-  const json = JSON.stringify(data, null, 2);
-  const encryptedPayload = encrypt(json);
-
-  const filename = `backup-${new Date().toISOString().replace(/[:.]/g, "-")}.enc`;
-
-  // Store encrypted backup file on disk
-  const { writeFile } = await import("fs/promises");
-  const { join } = await import("path");
-  const dir = join(process.cwd(), "data", "backups");
-  const { mkdir } = await import("fs/promises");
-  await mkdir(dir, { recursive: true });
-  const filePath = join(dir, filename);
-  await writeFile(filePath, encryptedPayload, "utf8");
-
-  const sizeBytes = Buffer.byteLength(encryptedPayload, "utf8");
-
-  const backup = await db.backup.create({
-    data: {
-      filename,
-      sizeBytes,
-      encrypted: true,
-      createdById: session.user.id,
-    },
-  });
-
-  // Prune oldest backups beyond the limit
-  const maxCount = await getMaxBackups();
-  const all = await db.backup.findMany({
-    orderBy: { createdAt: "desc" },
-    select: { id: true, filename: true },
-  });
-
-  if (all.length > maxCount) {
-    const toDelete = all.slice(maxCount);
-    const { unlink } = await import("fs/promises");
-    for (const old of toDelete) {
-      const oldPath = join(dir, old.filename);
-      await unlink(oldPath).catch(() => {});
-      await db.backup.delete({ where: { id: old.id } }).catch(() => {});
-    }
-  }
-
+  const backup = await createBackup(session.user.id);
   return NextResponse.json(backup, { status: 201 });
 }
 
-// GET — list backups (no query param) or download a specific one (?id=...)
+// GET — list backups or download one (?id=...)
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session || session.user.role !== "ADMIN") {
@@ -104,14 +26,12 @@ export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
 
   if (id) {
-    // Download specific backup
     const backup = await db.backup.findUnique({ where: { id } });
     if (!backup) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const { readFile } = await import("fs/promises");
     const { join } = await import("path");
-    const filePath = join(process.cwd(), "data", "backups", backup.filename);
-    const content = await readFile(filePath, "utf8").catch(() => null);
+    const content = await readFile(join(getBackupDir(), backup.filename), "utf8").catch(() => null);
     if (!content) return NextResponse.json({ error: "Backup file missing from disk" }, { status: 404 });
 
     return new NextResponse(content, {
@@ -122,15 +42,29 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // List all backups
-  const backups = await db.backup.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { createdBy: { select: { name: true, email: true } } },
+  const SETTING_KEYS = [
+    "backup_max_count", "backup_schedule",
+    "backup_schedule_hour", "backup_last_ran",
+  ];
+
+  const [backups, settingRows] = await Promise.all([
+    db.backup.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { createdBy: { select: { name: true, email: true } } },
+    }),
+    db.appSetting.findMany({ where: { key: { in: SETTING_KEYS } } }),
+  ]);
+
+  const s: Record<string, string> = {};
+  for (const r of settingRows) s[r.key] = r.value;
+
+  return NextResponse.json({
+    backups,
+    maxCount: Number(s["backup_max_count"] ?? 10),
+    schedule: s["backup_schedule"] ?? "disabled",
+    scheduleHour: Number(s["backup_schedule_hour"] ?? 2),
+    lastRan: s["backup_last_ran"] ?? null,
   });
-
-  const maxCount = await getMaxBackups();
-
-  return NextResponse.json({ backups, maxCount });
 }
 
 // DELETE — remove a backup by id
@@ -148,14 +82,26 @@ export async function DELETE(req: NextRequest) {
 
   const { unlink } = await import("fs/promises");
   const { join } = await import("path");
-  await unlink(join(process.cwd(), "data", "backups", backup.filename)).catch(() => {});
+  await unlink(join(getBackupDir(), backup.filename)).catch(() => {});
   await db.backup.delete({ where: { id } });
 
   return NextResponse.json({ success: true });
 }
 
-// PATCH — update max backup count setting
-const patchSchema = z.object({ maxCount: z.number().int().min(1).max(100) });
+// PATCH — update retention count and/or schedule
+const patchSchema = z.object({
+  maxCount: z.number().int().min(1).max(100).optional(),
+  schedule: z.enum(["disabled", "daily", "weekly", "monthly"]).optional(),
+  scheduleHour: z.number().int().min(0).max(23).optional(),
+});
+
+function upsert(key: string, value: string) {
+  return db.appSetting.upsert({
+    where: { key },
+    create: { key, value },
+    update: { value },
+  });
+}
 
 export async function PATCH(req: NextRequest) {
   const session = await auth();
@@ -165,13 +111,16 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json();
   const parsed = patchSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+  }
 
-  await db.appSetting.upsert({
-    where: { key: "backup_max_count" },
-    create: { key: "backup_max_count", value: String(parsed.data.maxCount) },
-    update: { value: String(parsed.data.maxCount) },
-  });
+  const ops: Promise<unknown>[] = [];
+  const { maxCount, schedule, scheduleHour } = parsed.data;
+  if (maxCount !== undefined) ops.push(upsert("backup_max_count", String(maxCount)));
+  if (schedule !== undefined) ops.push(upsert("backup_schedule", schedule));
+  if (scheduleHour !== undefined) ops.push(upsert("backup_schedule_hour", String(scheduleHour)));
 
+  await Promise.all(ops);
   return NextResponse.json({ success: true });
 }

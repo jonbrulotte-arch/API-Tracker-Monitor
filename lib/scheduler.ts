@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { runCheck } from "./monitor";
 import { notifyKeyExpiry } from "./notifications";
+import { createBackup, isScheduledBackupDue } from "./backup";
 
 let started = false;
 let lastExpiryCheck = 0;
@@ -30,10 +31,46 @@ export function startScheduler() {
         lastExpiryCheck = now.getTime();
         await checkExpiryNotifications(now);
       }
+
+      // Scheduled backup
+      await checkScheduledBackup(now);
     } catch (err) {
       console.error("[scheduler] error:", err);
     }
   }, 60_000);
+}
+
+async function checkScheduledBackup(now: Date) {
+  const rows = await db.appSetting.findMany({
+    where: { key: { in: ["backup_schedule", "backup_schedule_hour", "backup_last_ran"] } },
+  });
+  const s: Record<string, string> = {};
+  for (const r of rows) s[r.key] = r.value;
+
+  const schedule = s["backup_schedule"] ?? "disabled";
+  const scheduledHour = Number(s["backup_schedule_hour"] ?? 2);
+  const lastRan = s["backup_last_ran"] ? new Date(s["backup_last_ran"]) : null;
+
+  if (!isScheduledBackupDue(schedule, scheduledHour, lastRan, now)) return;
+
+  // Find an active admin to attribute the backup to
+  const admin = await db.user.findFirst({
+    where: { role: "ADMIN", status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (!admin) return;
+
+  try {
+    await createBackup(admin.id);
+    await db.appSetting.upsert({
+      where: { key: "backup_last_ran" },
+      create: { key: "backup_last_ran", value: now.toISOString() },
+      update: { value: now.toISOString() },
+    });
+    console.log(`[scheduler] scheduled backup completed (${schedule})`);
+  } catch (err) {
+    console.error("[scheduler] scheduled backup failed:", err);
+  }
 }
 
 export async function checkExpiryNotifications(now: Date = new Date()) {
