@@ -25,12 +25,16 @@ export async function verifyToken(raw: string): Promise<{
 
   const token = await db.accessToken.findUnique({
     where: { tokenHash: hash },
-    select: { id: true, userId: true, scopes: true, revokedAt: true, expiresAt: true, prefix: true, name: true },
+    select: {
+      id: true, userId: true, scopes: true, revokedAt: true, expiresAt: true, prefix: true, name: true,
+      user: { select: { status: true } },
+    },
   });
 
   if (!token) return null;
   if (token.revokedAt) return null;
   if (token.expiresAt && token.expiresAt < new Date()) return null;
+  if (token.user.status !== "ACTIVE") return null;
 
   // Update last used (fire-and-forget)
   db.accessToken.update({

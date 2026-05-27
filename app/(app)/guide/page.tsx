@@ -53,11 +53,16 @@ const NAV = [
     children: [
       { id: "creating-tokens", label: "Creating Tokens" },
       { id: "using-tokens", label: "Using Tokens" },
+      { id: "admin-token-mgmt", label: "Admin: Manage All Tokens" },
     ],
   },
   {
     id: "team",
     label: "Team & Users",
+    children: [
+      { id: "roles", label: "Roles" },
+      { id: "disabling-users", label: "Disabling Accounts" },
+    ],
   },
   {
     id: "security",
@@ -350,33 +355,73 @@ export API_MONITOR_URL="http://192.168.1.10:3020"`}
               />
               <P>See the <a href="/docs" className="text-blue-400 hover:text-blue-300">API Reference</a> for full endpoint documentation and code examples in Node.js, Python, and GitHub Actions.</P>
             </DocSubSection>
+
+            <DocSubSection id="admin-token-mgmt" title="Admin: Manage All Tokens">
+              <P>
+                Admins can view and revoke every access token issued by every team member from{" "}
+                <strong className="text-[#c8cdd6]">Settings → All Access Tokens</strong>.
+                The panel shows:
+              </P>
+              <ul className="list-disc list-inside space-y-1.5 text-sm text-[#8892a4] pl-1">
+                <li><strong className="text-[#c8cdd6]">Token name and prefix</strong> — identifies which token it is without exposing the secret.</li>
+                <li><strong className="text-[#c8cdd6]">Owner</strong> — the team member who created it, including their account status.</li>
+                <li><strong className="text-[#c8cdd6]">Scopes, created date, last used, and expiry</strong> — full audit trail.</li>
+                <li><strong className="text-[#c8cdd6]">Status badge</strong> — Active, Revoked, Expired, or Blocked (owner's account is disabled).</li>
+              </ul>
+              <Callout type="info" title="Disabled account = blocked tokens">
+                When a user account is set to <strong>Disabled</strong>, all of their access tokens
+                are automatically blocked at the API boundary — no request using those tokens will
+                succeed. The tokens are not deleted, so re-enabling the account restores access
+                immediately. Admins can also permanently revoke individual tokens at any time.
+              </Callout>
+            </DocSubSection>
           </DocSection>
 
           {/* ── Team & Users ──────────────────────────────────────────── */}
           <DocSection id="team" title="Team & Users">
-            <Table
-              headers={["Role", "Can do"]}
-              rows={[
-                [
-                  <span key="a" className="text-violet-400 text-xs font-medium">Admin</span>,
-                  "All key operations, manage Slack notifications, view all team members. First registered account.",
-                ],
-                [
-                  <span key="m" className="text-[#8892a4] text-xs font-medium">Member</span>,
-                  "All key operations (add, edit, delete, monitor), issue their own access tokens. Cannot change Slack settings.",
-                ],
-              ]}
-            />
-            <Callout type="info">
-              All authenticated users share access to all keys. There is no per-key ownership
-              restriction — this is intentional for team use where any member may need to rotate
-              a key in an emergency.
-            </Callout>
-            <P>
-              New users register at <InlineCode>/register</InlineCode>. There is no invite flow —
-              you control access by controlling who can reach the registration page (e.g. put it
-              behind your VPN or nginx auth).
-            </P>
+
+            <DocSubSection id="roles" title="Roles">
+              <Table
+                headers={["Role", "Can do"]}
+                rows={[
+                  [
+                    <span key="a" className="text-violet-400 text-xs font-medium">Admin</span>,
+                    "All key operations, manage notification settings (Slack / Teams / Email), view and revoke all team members' access tokens, disable/enable accounts, configure app name and backup schedule. First registered account.",
+                  ],
+                  [
+                    <span key="m" className="text-[#8892a4] text-xs font-medium">Member</span>,
+                    "All key operations (add, edit, delete, monitor), issue and revoke their own access tokens. Cannot change notification or admin settings.",
+                  ],
+                ]}
+              />
+              <Callout type="info">
+                All authenticated users share access to all keys. There is no per-key ownership
+                restriction — this is intentional for team use where any member may need to rotate
+                a key in an emergency.
+              </Callout>
+              <P>
+                New users register at <InlineCode>/register</InlineCode>. There is no invite flow —
+                you control access by controlling who can reach the registration page (e.g. put it
+                behind your VPN or nginx auth).
+              </P>
+            </DocSubSection>
+
+            <DocSubSection id="disabling-users" title="Disabling Accounts">
+              <P>
+                Admins can disable a team member's account from{" "}
+                <strong className="text-[#c8cdd6]">Settings → Team</strong>. A disabled account:
+              </P>
+              <ul className="list-disc list-inside space-y-1.5 text-sm text-[#8892a4] pl-1">
+                <li>Cannot log in to the web UI — the session is rejected at sign-in.</li>
+                <li>Has all API access tokens <strong className="text-[#c8cdd6]">blocked immediately</strong> — any in-flight API request using one of their tokens returns <InlineCode>401 Unauthorized</InlineCode>.</li>
+                <li>Retains all data (keys, tokens, audit history) so nothing is lost if the account is re-enabled later.</li>
+              </ul>
+              <Callout type="tip" title="Re-enabling restores token access">
+                Because tokens are blocked rather than deleted, setting the account back to Active
+                instantly restores all previously working tokens. If you want to permanently cut
+                access, use the <strong>All Access Tokens</strong> panel to revoke individual tokens.
+              </Callout>
+            </DocSubSection>
           </DocSection>
 
           {/* ── Security Model ────────────────────────────────────────── */}
@@ -386,7 +431,7 @@ export API_MONITOR_URL="http://192.168.1.10:3020"`}
               rows={[
                 ["Key storage", "AES-256-GCM encryption. The plaintext value is never written to disk. Only the ciphertext + IV + auth tag are stored."],
                 ["Encryption key", <>Derived from <InlineCode>ENCRYPTION_KEY</InlineCode> env var (64 hex chars = 32 bytes). Changing this env var will break decryption of all existing keys.</>],
-                ["Access tokens", "SHA-256 hashed before storage. The plaintext token is never stored — only the hash. Compromise of the database does not expose token values."],
+                ["Access tokens", "SHA-256 hashed before storage. The plaintext token is never stored — only the hash. Compromise of the database does not expose token values. At verification time the owner's account status is checked — tokens from disabled accounts are rejected even if not explicitly revoked."],
                 ["Session security", <>NextAuth JWT sessions signed with <InlineCode>AUTH_SECRET</InlineCode>. Rotating this value invalidates all active sessions.</>],
                 ["Health checks", "Made from your server to your configured endpoint. Key values leave only to your own infrastructure."],
                 ["Key reveal", "Requires an authenticated session. Reveal requests are made server-side; the decrypted value is returned over HTTPS to the logged-in browser only."],
