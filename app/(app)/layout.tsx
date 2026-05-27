@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SessionProvider } from "next-auth/react";
 import { startScheduler } from "@/lib/scheduler";
+import { getAppName } from "@/lib/app-config";
 
 // Start the background monitor scheduler (server-side, once)
 if (process.env.NODE_ENV !== "test") {
@@ -16,10 +17,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (session.user.status === "PENDING") redirect("/pending");
   if (session.user.status === "DISABLED") redirect("/login");
 
+  const appName = await getAppName();
+
   return (
     <SessionProvider>
       <div className="flex h-full min-h-screen">
-        <Sidebar />
+        <Sidebar appName={appName} />
         <main className="flex-1 ml-56 min-h-screen flex flex-col">{children}</main>
       </div>
     </SessionProvider>

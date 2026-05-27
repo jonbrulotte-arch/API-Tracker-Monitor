@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { db } from "./db";
+import { getAppName } from "./app-config";
 
 async function logEmail(opts: {
   type: string;
@@ -78,7 +79,7 @@ export async function sendEmailNotification(
   return success;
 }
 
-function baseHtml(title: string, rows: { label: string; value: string }[], footer?: string): string {
+function baseHtml(title: string, rows: { label: string; value: string }[], footer?: string, appName = "API Monitor"): string {
   const rowsHtml = rows
     .map((r) => `<tr><td style="padding:6px 12px;color:#8892a4;font-weight:600;white-space:nowrap">${r.label}</td><td style="padding:6px 12px;color:#e8eaf0">${r.value}</td></tr>`)
     .join("");
@@ -87,7 +88,7 @@ function baseHtml(title: string, rows: { label: string; value: string }[], foote
 <body style="margin:0;padding:24px;background:#0d1018;font-family:system-ui,sans-serif">
   <div style="max-width:520px;margin:0 auto;background:#0f1117;border:1px solid #1e2535;border-radius:8px;overflow:hidden">
     <div style="background:#1a2130;padding:16px 20px;border-bottom:1px solid #1e2535">
-      <span style="color:#e8eaf0;font-size:15px;font-weight:700">API Monitor</span>
+      <span style="color:#e8eaf0;font-size:15px;font-weight:700">${appName}</span>
     </div>
     <div style="padding:20px">
       <h2 style="margin:0 0 16px;color:#e8eaf0;font-size:16px">${title}</h2>
@@ -103,56 +104,61 @@ function baseHtml(title: string, rows: { label: string; value: string }[], foote
 
 export async function emailNotifyMonitorRecovered(keyName: string, provider: string) {
   if (!await isEnabled("email_notify_on_failure")) return;
+  const appName = await getAppName();
   const subject = `✅ Monitor Recovered: ${keyName}`;
   const html = baseHtml("API Key Monitor Recovered", [
     { label: "Key", value: keyName },
     { label: "Provider", value: provider },
     { label: "Status", value: "Back online" },
-  ], `Recovered at ${new Date().toUTCString()}`);
+  ], `Recovered at ${new Date().toUTCString()}`, appName);
   await sendEmailNotification(subject, html, { type: "monitor_recovered", keyName, provider });
 }
 
 export async function emailNotifyMonitorFailure(keyName: string, provider: string, errorMessage: string, statusCode?: number | null) {
   if (!await isEnabled("email_notify_on_failure")) return;
+  const appName = await getAppName();
   const subject = `🚨 Monitor Failure: ${keyName}`;
   const html = baseHtml("API Key Monitor Failure", [
     { label: "Key", value: keyName },
     { label: "Provider", value: provider },
     { label: "Status Code", value: String(statusCode ?? "N/A") },
     { label: "Error", value: errorMessage ?? "Unknown" },
-  ], `Checked at ${new Date().toUTCString()}`);
+  ], `Checked at ${new Date().toUTCString()}`, appName);
   await sendEmailNotification(subject, html, { type: "monitor_failure", keyName, provider });
 }
 
 export async function emailNotifyKeyExpiry(keyName: string, provider: string, daysUntilExpiry: number) {
   const urgency = daysUntilExpiry <= 3 ? "🔴" : daysUntilExpiry <= 7 ? "🟡" : "🟠";
+  const appName = await getAppName();
   const subject = `${urgency} Key Expiry Warning: ${keyName} expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}`;
   const html = baseHtml(`${urgency} API Key Expiry Warning`, [
     { label: "Key", value: keyName },
     { label: "Provider", value: provider },
     { label: "Expires In", value: `${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}` },
-  ]);
+  ], undefined, appName);
   await sendEmailNotification(subject, html, { type: "key_expiry", keyName, provider });
 }
 
 export async function emailNotifyKeyAdded(keyName: string, provider: string, addedBy: string) {
   if (!await isEnabled("email_notify_on_key_add")) return;
+  const appName = await getAppName();
   const subject = `✅ API Key Added: ${keyName}`;
   const html = baseHtml("API Key Added", [
     { label: "Key", value: keyName },
     { label: "Provider", value: provider },
     { label: "Added by", value: addedBy },
-  ], `Added at ${new Date().toUTCString()}`);
+  ], `Added at ${new Date().toUTCString()}`, appName);
   await sendEmailNotification(subject, html, { type: "key_added", keyName, provider });
 }
 
 export async function emailNotifyKeyRemoved(keyName: string, provider: string, removedBy: string) {
   if (!await isEnabled("email_notify_on_key_remove")) return;
+  const appName = await getAppName();
   const subject = `🗑️ API Key Removed: ${keyName}`;
   const html = baseHtml("API Key Removed", [
     { label: "Key", value: keyName },
     { label: "Provider", value: provider },
     { label: "Removed by", value: removedBy },
-  ], `Removed at ${new Date().toUTCString()}`);
+  ], `Removed at ${new Date().toUTCString()}`, appName);
   await sendEmailNotification(subject, html, { type: "key_removed", keyName, provider });
 }

@@ -8,6 +8,8 @@ import { BackupSettings } from "@/components/settings/backup-settings";
 import { AccessTokenSettings } from "@/components/settings/access-token-settings";
 import { TeamSettings } from "@/components/settings/team-settings";
 import { ProfileSettings } from "@/components/settings/profile-settings";
+import { AppNameSettings } from "@/components/settings/app-name-settings";
+import { getAppName } from "@/lib/app-config";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,7 @@ export default async function SettingsPage() {
   const role = session?.user?.role ?? "MEMBER";
   const isAdmin = role === "ADMIN";
   const isAdminOrSub = isAdmin || role === "SUB_ADMIN";
+  const appName = isAdmin ? await getAppName() : "API Monitor";
 
   return (
     <div className="flex flex-col flex-1">
@@ -32,6 +35,9 @@ export default async function SettingsPage() {
 
         {/* Access token API */}
         <AccessTokenSettings />
+
+        {/* App name — admin only */}
+        {isAdmin && <AppNameSettings initialName={appName} />}
 
         {/* Slack notifications — admin only */}
         {isAdmin && <SlackSettings />}

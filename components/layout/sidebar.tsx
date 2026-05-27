@@ -31,7 +31,7 @@ const docsNav = [
   { href: "/docs", label: "API Reference", icon: Code2 },
 ];
 
-export function Sidebar() {
+export function Sidebar({ appName }: { appName: string }) {
   const pathname = usePathname();
 
   const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) => {
@@ -59,7 +59,7 @@ export function Sidebar() {
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600">
           <Shield className="h-4 w-4 text-white" />
         </div>
-        <span className="text-sm font-semibold text-[#e8eaf0]">API Monitor</span>
+        <span className="text-sm font-semibold text-[#e8eaf0]">{appName}</span>
       </div>
 
       {/* Nav */}
