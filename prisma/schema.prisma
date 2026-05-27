@@ -14,6 +14,7 @@ model User {
   image         String?
   password      String?
   role          String    @default("MEMBER")
+  status        String    @default("ACTIVE")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -113,6 +114,18 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model SlackLog {
+  id        String   @id @default(cuid())
+  type      String
+  keyName   String?
+  provider  String?
+  message   String
+  success   Boolean
+  sentAt    DateTime @default(now())
+
+  @@index([sentAt])
 }
 
 model AccessToken {

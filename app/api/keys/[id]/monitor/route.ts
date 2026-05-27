@@ -40,6 +40,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  await db.monitorResult.deleteMany({ where: { apiKeyId: id } });
   await db.monitorConfig.delete({ where: { apiKeyId: id } });
   return NextResponse.json({ success: true });
 }

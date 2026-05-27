@@ -36,7 +36,7 @@ export function startScheduler() {
   }, 60_000);
 }
 
-async function checkExpiryNotifications(now: Date) {
+export async function checkExpiryNotifications(now: Date = new Date()) {
   const notifySetting = await db.appSetting.findUnique({ where: { key: "notify_on_expiry" } });
   if (notifySetting?.value === "false") return;
 

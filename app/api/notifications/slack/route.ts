@@ -84,18 +84,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const ok = await sendSlackNotification({
-    text: "✅ API Monitor — Slack webhook test successful!",
-    blocks: [
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: "✅ *Slack webhook test successful!*\nYour API Monitor notifications are configured correctly.",
+  const ok = await sendSlackNotification(
+    {
+      text: "✅ API Monitor — Slack webhook test successful!",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "✅ *Slack webhook test successful!*\nYour API Monitor notifications are configured correctly.",
+          },
         },
-      },
-    ],
-  });
+      ],
+    },
+    { type: "test" }
+  );
 
   if (!ok) {
     return NextResponse.json({ error: "Test message failed — check your webhook URL" }, { status: 400 });

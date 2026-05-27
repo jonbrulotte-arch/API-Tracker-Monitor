@@ -84,9 +84,9 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Remove monitor config for this key?")) return;
+    if (!confirm("Remove monitor config and all check history for this key?")) return;
     await fetch(`/api/keys/${keyId}/monitor`, { method: "DELETE" });
-    router.refresh();
+    router.push(`/keys/${keyId}`);
   };
 
   const injectionHints: Record<string, string> = {

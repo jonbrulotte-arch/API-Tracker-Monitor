@@ -25,12 +25,14 @@ export async function POST(req: NextRequest) {
   }
 
   const existingUsers = await db.user.count();
-  const role = existingUsers === 0 ? "ADMIN" : "MEMBER";
+  const isFirst = existingUsers === 0;
+  const role = isFirst ? "ADMIN" : "MEMBER";
+  const status = isFirst ? "ACTIVE" : "PENDING";
 
   const hashed = await bcrypt.hash(password, 12);
   const user = await db.user.create({
-    data: { name, email, password: hashed, role },
-    select: { id: true, email: true, name: true, role: true },
+    data: { name, email, password: hashed, role, status },
+    select: { id: true, email: true, name: true, role: true, status: true },
   });
 
   return NextResponse.json(user, { status: 201 });
