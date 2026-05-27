@@ -29,7 +29,7 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Open http://localhost:3000 and register the first account (automatically becomes admin).
+Open http://localhost:3020 and register the first account (automatically becomes admin).
 
 ## Environment Variables
 
@@ -49,15 +49,15 @@ Issue an access token in Settings → API Access Tokens, then:
 ```bash
 # Fetch a key by name (returns decrypted value)
 curl -H "Authorization: Bearer atm_..." \
-  http://localhost:3000/api/v1/keys/OpenAI%20Production
+  http://localhost:3020/api/v1/keys/OpenAI%20Production
 
 # List all keys with values
 curl -H "Authorization: Bearer atm_..." \
-  "http://localhost:3000/api/v1/keys?reveal=true"
+  "http://localhost:3020/api/v1/keys?reveal=true"
 
 # Filter by provider
 curl -H "Authorization: Bearer atm_..." \
-  "http://localhost:3000/api/v1/keys?provider=openai&reveal=true"
+  "http://localhost:3020/api/v1/keys?provider=openai&reveal=true"
 ```
 
 **Token scopes:**
