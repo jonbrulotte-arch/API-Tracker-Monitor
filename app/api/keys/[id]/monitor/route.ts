@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { writeAuditLog } from "@/lib/audit";
 
 const monitorSchema = z.object({
   endpoint: z.string().url(),
@@ -26,11 +27,44 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
+  // Capture before-state and key metadata for the audit diff
+  const [existing, apiKey] = await Promise.all([
+    db.monitorConfig.findUnique({ where: { apiKeyId: id } }),
+    db.apiKey.findUnique({ where: { id }, select: { name: true, provider: true } }),
+  ]);
+
+  const isCreate = !existing;
   const config = await db.monitorConfig.upsert({
     where: { apiKeyId: id },
     create: { apiKeyId: id, ...parsed.data },
     update: parsed.data,
   });
+
+  if (apiKey) {
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    if (isCreate) {
+      changes.monitor = { from: null, to: "configured" };
+    } else {
+      const fields = ["endpoint", "method", "injectionType", "injectionKey", "injectionFormat", "expectedStatus", "intervalMinutes", "enabled"] as const;
+      for (const f of fields) {
+        if (parsed.data[f] !== existing[f]) {
+          changes[f] = { from: existing[f], to: parsed.data[f] };
+        }
+      }
+    }
+
+    writeAuditLog({
+      action: isCreate ? "created" : "updated",
+      entityType: "monitor",
+      entityId: id,
+      entityName: apiKey.name,
+      provider: apiKey.provider,
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userName: session.user.name,
+      details: Object.keys(changes).length > 0 ? changes : undefined,
+    }).catch(() => {});
+  }
 
   return NextResponse.json(config);
 }
@@ -40,7 +74,28 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+
+  const apiKey = await db.apiKey.findUnique({
+    where: { id },
+    select: { name: true, provider: true },
+  });
+
   await db.monitorResult.deleteMany({ where: { apiKeyId: id } });
   await db.monitorConfig.delete({ where: { apiKeyId: id } });
+
+  if (apiKey) {
+    writeAuditLog({
+      action: "deleted",
+      entityType: "monitor",
+      entityId: id,
+      entityName: apiKey.name,
+      provider: apiKey.provider,
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userName: session.user.name,
+    }).catch(() => {});
+  }
+
   return NextResponse.json({ success: true });
 }
+

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { Bell } from "lucide-react";
+import { NotificationBell } from "./notification-bell";
 
 interface TopbarProps {
   title: string;
@@ -20,9 +20,7 @@ export function Topbar({ title, description, actions }: TopbarProps) {
       </div>
       <div className="flex items-center gap-3">
         {actions}
-        <button className="flex h-8 w-8 items-center justify-center rounded-md text-[#8892a4] hover:bg-[#161b27] hover:text-[#e8eaf0] transition-colors">
-          <Bell className="h-4 w-4" />
-        </button>
+        <NotificationBell />
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold">
           {session?.user?.name?.charAt(0).toUpperCase() ?? session?.user?.email?.charAt(0).toUpperCase() ?? "?"}
         </div>
