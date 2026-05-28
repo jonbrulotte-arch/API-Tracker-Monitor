@@ -118,6 +118,7 @@ export async function teamsNotifyMonitorFailure(keyName: string, provider: strin
 }
 
 export async function teamsNotifyKeyExpiry(keyName: string, provider: string, daysUntilExpiry: number) {
+  if (!await isEnabled("teams_notify_on_expiry")) return;
   const urgency = daysUntilExpiry <= 3 ? "🔴" : daysUntilExpiry <= 7 ? "🟡" : "🟠";
   await sendTeamsNotification(
     `${urgency} API Key Expiry Warning`,

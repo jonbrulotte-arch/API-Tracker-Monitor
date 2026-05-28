@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Send, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Bell, Send, ChevronDown, ChevronUp } from "lucide-react";
 
 interface SlackLogEntry {
   id: string;
@@ -39,7 +39,6 @@ export function SlackSettings() {
   const [notifyOnKeyRemove, setNotifyOnKeyRemove] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [forceChecking, setForceChecking] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const [showLog, setShowLog] = useState(false);
@@ -105,23 +104,6 @@ export function SlackSettings() {
       }
     } finally {
       setTesting(false);
-    }
-  };
-
-  const handleForceCheck = async () => {
-    setForceChecking(true);
-    setStatus(null);
-    try {
-      const res = await fetch("/api/notifications/slack/check", { method: "POST" });
-      if (res.ok) {
-        setStatus({ type: "success", message: "Expiry check complete — alerts sent for any keys within the warning window." });
-        if (showLog) await fetchLog();
-      } else {
-        const d = await res.json();
-        setStatus({ type: "error", message: d.error ?? "Check failed." });
-      }
-    } finally {
-      setForceChecking(false);
     }
   };
 
@@ -223,16 +205,6 @@ export function SlackSettings() {
             disabled={!webhookUrl}
           >
             <Send className="h-3.5 w-3.5" /> Send Test
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            loading={forceChecking}
-            onClick={handleForceCheck}
-            disabled={!webhookUrl}
-            title="Run expiry check now and send any due alerts"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Force Check
           </Button>
           <Button
             type="button"

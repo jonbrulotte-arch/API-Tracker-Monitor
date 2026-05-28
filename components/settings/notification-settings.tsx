@@ -3,11 +3,12 @@
 import { useState, useEffect, FormEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bell } from "lucide-react";
+import { Bell, RefreshCw } from "lucide-react";
 
 export function NotificationSettings() {
   const [expiryWarningDays, setExpiryWarningDays] = useState(14);
   const [saving, setSaving] = useState(false);
+  const [forceChecking, setForceChecking] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,22 @@ export function NotificationSettings() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleForceCheck = async () => {
+    setForceChecking(true);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/notifications/slack/check", { method: "POST" });
+      if (res.ok) {
+        setStatus({ type: "success", message: "Expiry check complete — alerts sent for any keys within the warning window." });
+      } else {
+        const d = await res.json();
+        setStatus({ type: "error", message: d.error ?? "Check failed." });
+      }
+    } finally {
+      setForceChecking(false);
     }
   };
 
@@ -75,7 +92,18 @@ export function NotificationSettings() {
           </div>
         )}
 
-        <Button type="submit" loading={saving}>Save</Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button type="submit" loading={saving}>Save</Button>
+          <Button
+            type="button"
+            variant="secondary"
+            loading={forceChecking}
+            onClick={handleForceCheck}
+            title="Run expiry check now and send any due alerts to all configured channels"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Force Check
+          </Button>
+        </div>
       </form>
     </Card>
   );
