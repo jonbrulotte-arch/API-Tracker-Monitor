@@ -41,9 +41,11 @@ const NAV = [
   },
   {
     id: "notifications",
-    label: "Slack Notifications",
+    label: "Notifications",
     children: [
-      { id: "setup-slack", label: "Setup" },
+      { id: "setup-slack", label: "Slack" },
+      { id: "setup-teams", label: "Microsoft Teams" },
+      { id: "setup-email", label: "Email (SMTP)" },
       { id: "notification-types", label: "Notification Types" },
     ],
   },
@@ -101,10 +103,18 @@ export default function GuidePage() {
             <DocSubSection id="first-login" title="First Login">
               <P>
                 Open the app and register. <strong className="text-[#c8cdd6]">The first account to
-                register automatically becomes the admin.</strong> Subsequent registrations create
-                member accounts. Admins can see all team members in Settings and manage Slack
-                notification configuration.
+                register automatically becomes the admin.</strong> Subsequent registrations land in{" "}
+                <strong className="text-[#c8cdd6]">Pending</strong> status — the admin must approve
+                them from <strong className="text-[#c8cdd6]">Settings → Team</strong> before they
+                can access the app.
               </P>
+              <Callout type="tip" title="Want to close registration?">
+                Admins can disable the <InlineCode>/register</InlineCode> page entirely from{" "}
+                <strong className="text-[#c8cdd6]">Settings → User Registration</strong>.
+                When disabled, the register page shows a &quot;Registration closed&quot; message and
+                the API rejects new account creation. The first-admin bootstrap always works
+                regardless of this setting.
+              </Callout>
               <Callout type="tip" title="Running on a LAN / server?">
                 Set <InlineCode>NEXTAUTH_URL</InlineCode> in your <InlineCode>.env</InlineCode> to
                 your server&apos;s address (e.g. <InlineCode>http://192.168.1.10:3020</InlineCode>)
@@ -170,8 +180,9 @@ export default function GuidePage() {
                 ]}
               />
               <P>
-                If Slack notifications are enabled, the scheduler sends a warning message once per
-                hour for any key expiring within the configured warning window (default: 14 days).
+                If Slack, Teams, or email notifications are enabled, the scheduler sends a warning
+                message once per hour for any key expiring within the configured warning window
+                (default: 14 days).
               </P>
             </DocSubSection>
 
@@ -292,33 +303,62 @@ export default function GuidePage() {
           </DocSection>
 
           {/* ── Notifications ─────────────────────────────────────────── */}
-          <DocSection id="notifications" title="Slack Notifications">
+          <DocSection id="notifications" title="Notifications">
+            <P>
+              API Monitor supports three notification channels — Slack, Microsoft Teams, and email
+              (SMTP). Each can be configured and toggled independently. All channel configurations
+              are admin-only. Webhook URLs and SMTP passwords are encrypted at rest using the same
+              AES-256-GCM key as your API keys.
+            </P>
 
-            <DocSubSection id="setup-slack" title="Setup">
-              <P>Admin users can configure a Slack incoming webhook in Settings.</P>
+            <DocSubSection id="setup-slack" title="Slack">
               <ol className="list-decimal list-inside space-y-2 text-sm text-[#8892a4] pl-1">
                 <li>Go to <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">api.slack.com/messaging/webhooks</a> and create an incoming webhook for your workspace.</li>
                 <li>Copy the webhook URL (starts with <InlineCode>https://hooks.slack.com/services/</InlineCode>).</li>
                 <li>Paste it in <strong className="text-[#c8cdd6]">Settings → Slack Notifications → Incoming Webhook URL</strong>.</li>
-                <li>Click <strong className="text-[#c8cdd6]">Send Test</strong> to verify it works.</li>
-                <li>Click <strong className="text-[#c8cdd6]">Save</strong>.</li>
+                <li>Click <strong className="text-[#c8cdd6]">Send Test</strong> to verify it works, then <strong className="text-[#c8cdd6]">Save</strong>.</li>
+              </ol>
+              <Callout type="info">
+                After saving, the webhook URL is masked as ••••••••. This is intentional — the URL
+                is treated as a secret and is not returned in plain text after it is stored.
+                To update it, paste a new URL over the mask.
+              </Callout>
+            </DocSubSection>
+
+            <DocSubSection id="setup-teams" title="Microsoft Teams">
+              <ol className="list-decimal list-inside space-y-2 text-sm text-[#8892a4] pl-1">
+                <li>In Teams, go to the channel you want alerts in → <strong className="text-[#c8cdd6]">… → Connectors → Incoming Webhook</strong>.</li>
+                <li>Name it (e.g. &quot;API Monitor&quot;) and copy the generated webhook URL.</li>
+                <li>Paste it in <strong className="text-[#c8cdd6]">Settings → Microsoft Teams → Webhook URL</strong>.</li>
+                <li>Click <strong className="text-[#c8cdd6]">Send Test</strong> then <strong className="text-[#c8cdd6]">Save</strong>.</li>
               </ol>
             </DocSubSection>
 
-            <DocSubSection id="notification-types" title="Notification Types">
+            <DocSubSection id="setup-email" title="Email (SMTP)">
+              <P>Configure any SMTP server — your own relay, SendGrid, Postmark, Gmail, etc.</P>
               <Table
-                headers={["Event", "Trigger", "Configurable"]}
+                headers={["Field", "Description"]}
                 rows={[
-                  [
-                    "Monitor failure",
-                    "A health check returns an unexpected status code or network error.",
-                    "Toggle on/off in Settings.",
-                  ],
-                  [
-                    "Key expiry warning",
-                    "Hourly check finds a key expiring within the warning window.",
-                    <>Toggle on/off. Warning window configurable (default: 14 days). Warning is sent once per hour while the key remains within the window.</>,
-                  ],
+                  ["SMTP Host", "Hostname of your SMTP server (e.g. smtp.sendgrid.net)."],
+                  ["Port", "Usually 587 (STARTTLS) or 465 (SSL). Defaults to 587."],
+                  ["Secure (SSL)", "Enable for port 465. Leave off for 587 with STARTTLS."],
+                  ["Username / Password", "SMTP auth credentials. The password is encrypted at rest."],
+                  ["From address", "The sender address shown in the email header."],
+                  ["To address", "The recipient — a team inbox or individual address."],
+                ]}
+              />
+            </DocSubSection>
+
+            <DocSubSection id="notification-types" title="Notification Types">
+              <P>Each channel has independent toggles for the following events:</P>
+              <Table
+                headers={["Event", "Trigger"]}
+                rows={[
+                  ["Monitor failure", "A health check returns an unexpected status code or network error."],
+                  ["Monitor recovered", "A previously failing check passes again."],
+                  ["Key expiry warning", "Hourly check finds a key expiring within the warning window (default: 14 days). Sent once per hour while still within the window."],
+                  ["Key added", "A new API key is created."],
+                  ["Key removed", "An API key is deleted."],
                 ]}
               />
               <Callout type="info">
@@ -386,23 +426,29 @@ export API_MONITOR_URL="http://192.168.1.10:3020"`}
                 rows={[
                   [
                     <span key="a" className="text-violet-400 text-xs font-medium">Admin</span>,
-                    "All key operations, manage notification settings (Slack / Teams / Email), view and revoke all team members' access tokens, disable/enable accounts, configure app name and backup schedule. First registered account.",
+                    "Everything. Manage notification settings (Slack / Teams / Email), view and revoke all team members' access tokens, approve/disable/enable accounts, configure app name, registration toggle, and backup schedule. First registered account.",
+                  ],
+                  [
+                    <span key="sa" className="text-blue-400 text-xs font-medium">Sub-Admin</span>,
+                    "Manage Members (approve, disable, change name/email). Edit and delete any key, including keys created by other users. View audit logs. Cannot change notification settings, manage Admin accounts, or access system configuration.",
                   ],
                   [
                     <span key="m" className="text-[#8892a4] text-xs font-medium">Member</span>,
-                    "All key operations (add, edit, delete, monitor), issue and revoke their own access tokens. Cannot change notification or admin settings.",
+                    "Add keys, view all team keys, reveal any key's value. Edit and delete only the keys they created. Issue and revoke their own access tokens. Cannot change notification or admin settings.",
                   ],
                 ]}
               />
               <Callout type="info">
-                All authenticated users share access to all keys. There is no per-key ownership
-                restriction — this is intentional for team use where any member may need to rotate
-                a key in an emergency.
+                All authenticated members can read all keys — names, metadata, monitor status, and
+                revealed values. <strong className="text-[#c8cdd6]">Edit and delete are ownership-scoped:</strong>{" "}
+                members can only modify or remove keys they created. Admins and Sub-Admins can
+                edit or delete any key.
               </Callout>
               <P>
-                New users register at <InlineCode>/register</InlineCode>. There is no invite flow —
-                you control access by controlling who can reach the registration page (e.g. put it
-                behind your VPN or nginx auth).
+                New users register at <InlineCode>/register</InlineCode> and start in{" "}
+                <strong className="text-[#c8cdd6]">Pending</strong> status until an Admin approves
+                them. Admins can also close registration entirely in{" "}
+                <strong className="text-[#c8cdd6]">Settings → User Registration</strong>.
               </P>
             </DocSubSection>
 
@@ -413,6 +459,7 @@ export API_MONITOR_URL="http://192.168.1.10:3020"`}
               </P>
               <ul className="list-disc list-inside space-y-1.5 text-sm text-[#8892a4] pl-1">
                 <li>Cannot log in to the web UI — the session is rejected at sign-in.</li>
+                <li>Has any active browser session terminated within 5 minutes — the JWT re-checks account status periodically, and middleware blocks the request as soon as the disabled status is detected.</li>
                 <li>Has all API access tokens <strong className="text-[#c8cdd6]">blocked immediately</strong> — any in-flight API request using one of their tokens returns <InlineCode>401 Unauthorized</InlineCode>.</li>
                 <li>Retains all data (keys, tokens, audit history) so nothing is lost if the account is re-enabled later.</li>
               </ul>
@@ -429,12 +476,13 @@ export API_MONITOR_URL="http://192.168.1.10:3020"`}
             <Table
               headers={["Concern", "Approach"]}
               rows={[
-                ["Key storage", "AES-256-GCM encryption. The plaintext value is never written to disk. Only the ciphertext + IV + auth tag are stored."],
+                ["Key storage", "AES-256-GCM encryption. The plaintext value is never written to disk. Only the ciphertext + IV (12-byte nonce) + auth tag are stored."],
+                ["Notification secrets", <>Slack and Teams webhook URLs and SMTP passwords are encrypted with AES-256-GCM before storage. They are never returned in plain text by the API — the GET endpoint shows <InlineCode>••••••••</InlineCode>.</>],
                 ["Encryption key", <>Derived from <InlineCode>ENCRYPTION_KEY</InlineCode> env var (64 hex chars = 32 bytes). Changing this env var will break decryption of all existing keys.</>],
                 ["Access tokens", "SHA-256 hashed before storage. The plaintext token is never stored — only the hash. Compromise of the database does not expose token values. At verification time the owner's account status is checked — tokens from disabled accounts are rejected even if not explicitly revoked."],
-                ["Session security", <>NextAuth JWT sessions signed with <InlineCode>AUTH_SECRET</InlineCode>. Rotating this value invalidates all active sessions.</>],
-                ["Health checks", "Made from your server to your configured endpoint. Key values leave only to your own infrastructure."],
-                ["Key reveal", "Requires an authenticated session. Reveal requests are made server-side; the decrypted value is returned over HTTPS to the logged-in browser only."],
+                ["Session security", <>NextAuth JWT sessions signed with <InlineCode>AUTH_SECRET</InlineCode> (minimum 32 chars, validated at startup). The JWT re-validates user status from the database every 5 minutes. Disabled accounts are blocked by edge middleware on every request.</>],
+                ["Health checks", <>Made from your server to your configured endpoint. Key values leave only to your own infrastructure. Private/internal URLs (localhost, RFC-1918, link-local, <InlineCode>.local</InlineCode> / <InlineCode>.internal</InlineCode>) are rejected to prevent SSRF.</>],
+                ["Key reveal", <>Requires an authenticated session. Rate-limited to 20 requests per user per minute. Reveal requests are made server-side; the decrypted value is returned over HTTPS to the logged-in browser only.</>],
                 ["GitHub OAuth", "Optional. Only enabled if AUTH_GITHUB_ID and AUTH_GITHUB_SECRET are set."],
               ]}
             />

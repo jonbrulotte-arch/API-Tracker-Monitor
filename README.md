@@ -5,11 +5,11 @@ A secure web app for developer teams to track, manage, and monitor API keys — 
 ## Features
 
 - **Key Management** — Store API keys encrypted at rest (AES-256-GCM). Track expiry dates, tags, and notes.
-- **Uptime Monitoring** — Per-key health checks via configurable HTTP endpoints. Supports header, query param, body, or custom injection formats.
+- **Uptime Monitoring** — Per-key health checks via configurable HTTP endpoints. Supports header, query param, body, or custom injection formats. Private/internal URLs are blocked (SSRF protection).
 - **Dashboard** — Summary cards, sortable key table with inline expiry/monitor status, response time display.
-- **Slack Notifications** — Webhook-based alerts when a monitor fails or a key is expiring soon.
+- **Notifications** — Slack, Microsoft Teams, and email (SMTP) alerts when a monitor fails, a key is expiring, or keys are added/removed. Webhook URLs and SMTP passwords are encrypted at rest.
 - **Access Token API** — Issue scoped bearer tokens so CI/CD pipelines and external tools can fetch key values programmatically.
-- **Multi-user** — Team accounts with admin/member roles. First registered user becomes admin.
+- **Multi-user** — Team accounts with Admin, Sub-Admin, and Member roles. New users land in a Pending state until an admin approves them. Registration can be disabled entirely from the admin settings.
 - **Auth** — Credentials login + optional GitHub OAuth.
 
 ## Quick Start
@@ -29,7 +29,7 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Open http://localhost:3020 and register the first account (automatically becomes admin).
+Open http://localhost:3020 and register the first account (automatically becomes admin). Subsequent accounts start in **Pending** state and must be approved by the admin in Settings → Team.
 
 ## Environment Variables
 
