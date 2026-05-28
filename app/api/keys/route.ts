@@ -5,10 +5,8 @@ import { db } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
 import { writeAuditLog } from "@/lib/audit";
 import { notifyKeyAdded } from "@/lib/notifications";
-import { isPublicUrl } from "@/lib/ssrf";
-
 const monitorSchema = z.object({
-  endpoint: z.string().url().refine(isPublicUrl, { message: "Private or internal URLs are not permitted" }),
+  endpoint: z.string().url(),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).default("GET"),
   injectionType: z.enum(["header", "query", "body", "custom"]).default("header"),
   injectionKey: z.string().min(1).max(200),
