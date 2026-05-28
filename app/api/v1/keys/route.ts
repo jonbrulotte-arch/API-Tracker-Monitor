@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
   const filtered = keys.filter((k) => {
     if (providerFilter && k.provider.toLowerCase() !== providerFilter) return false;
     if (tagFilter) {
-      const tags: string[] = JSON.parse(k.tags);
+      let tags: string[] = [];
+      try { tags = JSON.parse(k.tags); } catch { /* corrupted tag data */ }
       if (!tags.some((t) => t.toLowerCase() === tagFilter)) return false;
     }
     return true;
@@ -51,10 +52,12 @@ export async function GET(req: NextRequest) {
     if (reveal) {
       try { value = decrypt(k.encryptedValue); } catch { value = undefined; }
     }
+    let tags: string[] = [];
+    try { tags = JSON.parse(k.tags); } catch { /* corrupted tag data */ }
     return {
       id: k.id, name: k.name, provider: k.provider,
       ...(reveal ? { value } : { valueMask: maskKey("placeholder") }),
-      expiresAt: k.expiresAt, tags: JSON.parse(k.tags), status: k.status, updatedAt: k.updatedAt,
+      expiresAt: k.expiresAt, tags, status: k.status, updatedAt: k.updatedAt,
     };
   });
 

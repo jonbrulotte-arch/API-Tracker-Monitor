@@ -1,6 +1,12 @@
 import nodemailer from "nodemailer";
 import { db } from "./db";
+import { decrypt } from "./crypto";
 import { getAppName } from "./app-config";
+
+function decryptSetting(stored: string): string {
+  if (!stored) return stored;
+  try { return decrypt(stored); } catch { return stored; }
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -55,7 +61,7 @@ export async function sendEmailNotification(
     port: Number(cfg.smtp_port ?? 587),
     secure: cfg.smtp_secure === "true",
     auth: cfg.smtp_user
-      ? { user: cfg.smtp_user, pass: cfg.smtp_pass ?? "" }
+      ? { user: cfg.smtp_user, pass: decryptSetting(cfg.smtp_pass ?? "") }
       : undefined,
   });
 

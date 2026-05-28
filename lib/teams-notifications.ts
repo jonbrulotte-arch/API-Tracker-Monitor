@@ -1,4 +1,10 @@
 import { db } from "./db";
+import { decrypt } from "./crypto";
+
+function decryptSetting(stored: string): string {
+  if (!stored) return stored;
+  try { return decrypt(stored); } catch { return stored; }
+}
 
 async function logTeams(opts: {
   type: string;
@@ -17,7 +23,7 @@ async function logTeams(opts: {
 
 async function getWebhookUrl(): Promise<string | null> {
   const s = await db.appSetting.findUnique({ where: { key: "teams_webhook_url" } });
-  return s?.value || null;
+  return s?.value ? decryptSetting(s.value) : null;
 }
 
 async function isEnabled(settingKey: string): Promise<boolean> {

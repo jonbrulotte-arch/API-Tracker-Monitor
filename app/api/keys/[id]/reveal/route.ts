@@ -3,10 +3,15 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { writeAuditLog } from "@/lib/audit";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!checkRateLimit(`reveal:${session.user.id}`, 20)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   const { id } = await params;
   const key = await db.apiKey.findUnique({

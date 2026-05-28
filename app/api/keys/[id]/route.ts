@@ -46,11 +46,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    // Capture before-state for the diff
+    // Capture before-state for the diff and ownership check
     const before = await db.apiKey.findUnique({
       where: { id },
-      select: { name: true, provider: true, expiresAt: true, tags: true, notes: true },
+      select: { name: true, provider: true, expiresAt: true, tags: true, notes: true, createdById: true },
     });
+
+    if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const isPrivileged = session.user.role === "ADMIN" || session.user.role === "SUB_ADMIN";
+    if (before.createdById !== session.user.id && !isPrivileged) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { value, expiresAt, tags, ...rest } = parsed.data;
     const key = await db.apiKey.update({
@@ -104,11 +111,18 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params;
 
-  // Read before deleting so we can log and notify
+  // Read before deleting so we can check ownership, log, and notify
   const key = await db.apiKey.findUnique({
     where: { id },
-    select: { name: true, provider: true },
+    select: { name: true, provider: true, createdById: true },
   });
+
+  if (!key) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const isPrivileged = session.user.role === "ADMIN" || session.user.role === "SUB_ADMIN";
+  if (key.createdById !== session.user.id && !isPrivileged) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   await db.apiKey.delete({ where: { id } });
 

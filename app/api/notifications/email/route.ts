@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { encrypt } from "@/lib/crypto";
 import { sendEmailNotification } from "@/lib/email-notifications";
 
 const ALL_KEYS = [
@@ -73,9 +74,9 @@ export async function PUT(req: NextRequest) {
   if (d.smtpPort !== undefined) ops.push(upsert("smtp_port", String(d.smtpPort)));
   if (d.smtpSecure !== undefined) ops.push(upsert("smtp_secure", String(d.smtpSecure)));
   if (d.smtpUser !== undefined) ops.push(upsert("smtp_user", d.smtpUser ?? ""));
-  // Only update password if not the masked placeholder
+  // Only update password if not the masked placeholder; encrypt at rest
   if (d.smtpPass !== undefined && d.smtpPass !== "••••••••") {
-    ops.push(upsert("smtp_pass", d.smtpPass ?? ""));
+    ops.push(upsert("smtp_pass", d.smtpPass ? encrypt(d.smtpPass) : ""));
   }
   if (d.smtpFrom !== undefined) ops.push(upsert("smtp_from", d.smtpFrom ?? ""));
   if (d.emailTo !== undefined) ops.push(upsert("email_to", d.emailTo ?? ""));

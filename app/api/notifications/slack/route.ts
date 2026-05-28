@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { encrypt } from "@/lib/crypto";
 import { sendSlackNotification } from "@/lib/notifications";
 
 const ALL_KEYS = [
@@ -36,7 +37,7 @@ export async function GET() {
   for (const s of settings) r[s.key] = s.value;
 
   return NextResponse.json({
-    webhookUrl: r["slack_webhook_url"] ?? "",
+    webhookUrl: r["slack_webhook_url"] ? "••••••••" : "",
     notifyOnFailure: r["notify_on_failure"] !== "false",
     notifyOnExpiry: r["notify_on_expiry"] !== "false",
     notifyOnKeyAdd: r["notify_on_key_add"] !== "false",
@@ -59,7 +60,10 @@ export async function PUT(req: NextRequest) {
   const { webhookUrl, notifyOnFailure, notifyOnExpiry, notifyOnKeyAdd, notifyOnKeyRemove } = parsed.data;
 
   const ops = [
-    ...(webhookUrl !== undefined ? [upsertSetting("slack_webhook_url", webhookUrl ?? "")] : []),
+    // Skip update if the masked placeholder was sent back; encrypt new values at rest
+    ...(webhookUrl !== undefined && webhookUrl !== "••••••••"
+      ? [upsertSetting("slack_webhook_url", webhookUrl ? encrypt(webhookUrl) : "")]
+      : []),
     ...(notifyOnFailure !== undefined ? [upsertSetting("notify_on_failure", String(notifyOnFailure))] : []),
     ...(notifyOnExpiry !== undefined ? [upsertSetting("notify_on_expiry", String(notifyOnExpiry))] : []),
     ...(notifyOnKeyAdd !== undefined ? [upsertSetting("notify_on_key_add", String(notifyOnKeyAdd))] : []),

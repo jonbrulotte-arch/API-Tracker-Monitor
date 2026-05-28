@@ -3,13 +3,14 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
+import { isPublicUrl } from "@/lib/ssrf";
 
 const monitorSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().url().refine(isPublicUrl, { message: "Private or internal URLs are not permitted" }),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).default("GET"),
   injectionType: z.enum(["header", "query", "body", "custom"]).default("header"),
-  injectionKey: z.string().min(1),
-  injectionFormat: z.string().optional().nullable(),
+  injectionKey: z.string().min(1).max(200),
+  injectionFormat: z.string().max(500).optional().nullable(),
   expectedStatus: z.number().int().min(100).max(599).default(200),
   intervalMinutes: z.number().int().min(1).max(1440).default(15),
   enabled: z.boolean().default(true),
@@ -27,11 +28,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  // Capture before-state and key metadata for the audit diff
+  // Capture before-state, key metadata, and ownership for the audit diff
   const [existing, apiKey] = await Promise.all([
     db.monitorConfig.findUnique({ where: { apiKeyId: id } }),
-    db.apiKey.findUnique({ where: { id }, select: { name: true, provider: true } }),
+    db.apiKey.findUnique({ where: { id }, select: { name: true, provider: true, createdById: true } }),
   ]);
+
+  if (!apiKey) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const isPrivileged = session.user.role === "ADMIN" || session.user.role === "SUB_ADMIN";
+  if (apiKey.createdById !== session.user.id && !isPrivileged) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const isCreate = !existing;
   const config = await db.monitorConfig.upsert({
@@ -77,8 +85,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const apiKey = await db.apiKey.findUnique({
     where: { id },
-    select: { name: true, provider: true },
+    select: { name: true, provider: true, createdById: true },
   });
+
+  if (!apiKey) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const isPrivileged = session.user.role === "ADMIN" || session.user.role === "SUB_ADMIN";
+  if (apiKey.createdById !== session.user.id && !isPrivileged) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   await db.monitorResult.deleteMany({ where: { apiKeyId: id } });
   await db.monitorConfig.delete({ where: { apiKeyId: id } });

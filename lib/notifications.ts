@@ -1,6 +1,12 @@
 import { db } from "./db";
+import { decrypt } from "./crypto";
 import { teamsNotifyMonitorFailure, teamsNotifyMonitorRecovered, teamsNotifyKeyExpiry, teamsNotifyKeyAdded, teamsNotifyKeyRemoved } from "./teams-notifications";
 import { emailNotifyMonitorFailure, emailNotifyMonitorRecovered, emailNotifyKeyExpiry, emailNotifyKeyAdded, emailNotifyKeyRemoved } from "./email-notifications";
+
+function decryptSetting(stored: string): string {
+  if (!stored) return stored;
+  try { return decrypt(stored); } catch { return stored; }
+}
 
 export interface SlackNotification {
   text: string;
@@ -38,9 +44,10 @@ export async function sendSlackNotification(
   const setting = await db.appSetting.findUnique({ where: { key: "slack_webhook_url" } });
   if (!setting?.value) return false;
 
+  const webhookUrl = decryptSetting(setting.value);
   let success = false;
   try {
-    const res = await fetch(setting.value, {
+    const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

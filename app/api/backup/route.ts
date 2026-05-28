@@ -30,14 +30,24 @@ export async function GET(req: NextRequest) {
     if (!backup) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const { readFile } = await import("fs/promises");
-    const { join } = await import("path");
-    const content = await readFile(join(getBackupDir(), backup.filename), "utf8").catch(() => null);
+    const { join, basename } = await import("path");
+
+    // Guard against path-traversal in stored filenames
+    const safeBasename = basename(backup.filename);
+    if (!safeBasename || safeBasename !== backup.filename) {
+      return NextResponse.json({ error: "Invalid backup record" }, { status: 400 });
+    }
+
+    const content = await readFile(join(getBackupDir(), safeBasename), "utf8").catch(() => null);
     if (!content) return NextResponse.json({ error: "Backup file missing from disk" }, { status: 404 });
+
+    // Sanitize filename used in Content-Disposition to prevent header injection
+    const downloadName = safeBasename.replace(/[^\w.\-]/g, "_");
 
     return new NextResponse(content, {
       headers: {
         "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${backup.filename}"`,
+        "Content-Disposition": `attachment; filename="${downloadName}"`,
       },
     });
   }
@@ -81,8 +91,9 @@ export async function DELETE(req: NextRequest) {
   if (!backup) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { unlink } = await import("fs/promises");
-  const { join } = await import("path");
-  await unlink(join(getBackupDir(), backup.filename)).catch(() => {});
+  const { join, basename } = await import("path");
+  const safeBasename = basename(backup.filename);
+  await unlink(join(getBackupDir(), safeBasename)).catch(() => {});
   await db.backup.delete({ where: { id } });
 
   return NextResponse.json({ success: true });

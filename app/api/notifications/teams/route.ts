@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { encrypt } from "@/lib/crypto";
 import { sendTeamsNotification } from "@/lib/teams-notifications";
 
 const ALL_KEYS = [
@@ -33,7 +34,7 @@ export async function GET() {
   for (const row of rows) r[row.key] = row.value;
 
   return NextResponse.json({
-    webhookUrl: r["teams_webhook_url"] ?? "",
+    webhookUrl: r["teams_webhook_url"] ? "••••••••" : "",
     notifyOnFailure: r["teams_notify_on_failure"] !== "false",
     notifyOnExpiry: r["teams_notify_on_expiry"] !== "false",
     notifyOnKeyAdd: r["teams_notify_on_key_add"] !== "false",
@@ -56,7 +57,10 @@ export async function PUT(req: NextRequest) {
   const d = parsed.data;
   const ops: Promise<unknown>[] = [];
 
-  if (d.webhookUrl !== undefined) ops.push(upsert("teams_webhook_url", d.webhookUrl ?? ""));
+  // Skip update if the masked placeholder was sent back; encrypt new values at rest
+  if (d.webhookUrl !== undefined && d.webhookUrl !== "••••••••") {
+    ops.push(upsert("teams_webhook_url", d.webhookUrl ? encrypt(d.webhookUrl) : ""));
+  }
   if (d.notifyOnFailure !== undefined) ops.push(upsert("teams_notify_on_failure", String(d.notifyOnFailure)));
   if (d.notifyOnExpiry !== undefined) ops.push(upsert("teams_notify_on_expiry", String(d.notifyOnExpiry)));
   if (d.notifyOnKeyAdd !== undefined) ops.push(upsert("teams_notify_on_key_add", String(d.notifyOnKeyAdd)));

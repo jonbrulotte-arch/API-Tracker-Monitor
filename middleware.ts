@@ -15,9 +15,20 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Redirect any session belonging to a disabled account
+  // Block disabled accounts
   if (req.auth?.user?.status === "DISABLED") {
     return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  // Block pending accounts from everything except their waiting room
+  if (req.auth?.user?.status === "PENDING") {
+    if (pathname.startsWith("/api/")) {
+      return new Response(JSON.stringify({ error: "Account pending approval" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return NextResponse.redirect(new URL("/pending", req.url));
   }
 
   return NextResponse.next();
