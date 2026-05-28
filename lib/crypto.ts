@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
-const IV_LENGTH = 16;
+const IV_LENGTH = 12; // NIST SP 800-38D recommended 96-bit IV for GCM
 const TAG_LENGTH = 16;
 
 function getKey(): Buffer {

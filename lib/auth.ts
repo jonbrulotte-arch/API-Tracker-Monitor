@@ -7,6 +7,10 @@ import { db } from "./db";
 import { z } from "zod";
 import { checkRateLimit } from "./rate-limit";
 
+if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
+  throw new Error("AUTH_SECRET must be set and at least 32 characters long");
+}
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -64,7 +68,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "MEMBER";
         token.status = (user as { status?: string }).status ?? "ACTIVE";
+        token.statusCheckedAt = Date.now();
+        return token;
       }
+
+      // Re-validate user status every 5 minutes so disabled accounts
+      // are blocked promptly without a DB call on every request.
+      const CHECK_INTERVAL_MS = 5 * 60 * 1000;
+      if (
+        token.id &&
+        typeof token.statusCheckedAt === "number" &&
+        Date.now() - token.statusCheckedAt >= CHECK_INTERVAL_MS
+      ) {
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: token.id as string },
+            select: { status: true, role: true },
+          });
+          token.status = dbUser?.status ?? "DISABLED";
+          token.role = dbUser?.role ?? (token.role as string);
+          token.statusCheckedAt = Date.now();
+        } catch {
+          // Keep existing values if DB is temporarily unreachable
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {

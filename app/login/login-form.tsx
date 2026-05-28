@@ -12,7 +12,9 @@ import { Suspense } from "react";
 function LoginFormInner({ appName }: { appName: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const raw = searchParams.get("callbackUrl") ?? "/dashboard";
+  // Only allow same-origin relative paths — reject protocol-relative or absolute URLs
+  const callbackUrl = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

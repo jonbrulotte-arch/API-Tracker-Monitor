@@ -40,8 +40,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Only admins can promote users" }, { status: 403 });
   }
 
-  if (id === session.user.id && (role || status === "DISABLED")) {
-    return NextResponse.json({ error: "Cannot modify your own role/status this way" }, { status: 400 });
+  if (id === session.user.id) {
+    return NextResponse.json({ error: "Use the profile settings page to modify your own account" }, { status: 400 });
   }
 
   if (email && email !== target.email) {

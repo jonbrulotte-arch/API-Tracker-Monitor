@@ -6,8 +6,23 @@ import { encrypt } from "@/lib/crypto";
 import { writeAuditLog } from "@/lib/audit";
 import { notifyKeyAdded } from "@/lib/notifications";
 
+function isPublicUrl(rawUrl: string): boolean {
+  try {
+    const { hostname } = new URL(rawUrl);
+    const h = hostname.toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "0.0.0.0") return false;
+    if (/^10\./.test(h)) return false;
+    if (/^192\.168\./.test(h)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+    if (/^169\.254\./.test(h)) return false;
+    if (/^fc[0-9a-f][0-9a-f]:/i.test(h) || /^fe80:/i.test(h)) return false;
+    if (h.endsWith(".local") || h.endsWith(".internal") || h.endsWith(".localhost")) return false;
+    return true;
+  } catch { return false; }
+}
+
 const monitorSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().url().refine(isPublicUrl, { message: "Private or internal URLs are not permitted" }),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).default("GET"),
   injectionType: z.enum(["header", "query", "body", "custom"]).default("header"),
   injectionKey: z.string().min(1),

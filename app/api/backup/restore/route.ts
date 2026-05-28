@@ -1,39 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { encrypt } from "@/lib/crypto";
 
-interface BackupData {
-  version: number;
-  exportedAt: string;
-  apiKeys?: {
-    id: string;
-    name: string;
-    provider: string;
-    encryptedValue: string;
-    expiresAt: string | null;
-    tags: string;
-    notes: string | null;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
-    createdById: string;
-  }[];
-  monitorConfigs?: {
-    id: string;
-    apiKeyId: string;
-    endpoint: string;
-    method: string;
-    injectionType: string;
-    injectionKey: string;
-    injectionFormat: string | null;
-    expectedStatus: number;
-    intervalMinutes: number;
-    enabled: boolean;
-  }[];
-  appSettings?: { key: string; value: string }[];
-}
+const apiKeySchema = z.object({
+  id: z.string(),
+  name: z.string().max(100),
+  provider: z.string().max(100),
+  encryptedValue: z.string(),
+  expiresAt: z.string().nullable(),
+  tags: z.string(),
+  notes: z.string().max(2000).nullable(),
+  status: z.enum(["ACTIVE", "EXPIRING", "EXPIRED", "INACTIVE"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  createdById: z.string(),
+});
+
+const monitorConfigSchema = z.object({
+  id: z.string(),
+  apiKeyId: z.string(),
+  endpoint: z.string().url(),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]),
+  injectionType: z.enum(["header", "query", "body", "custom"]),
+  injectionKey: z.string().min(1).max(200),
+  injectionFormat: z.string().max(500).nullable(),
+  expectedStatus: z.number().int().min(100).max(599),
+  intervalMinutes: z.number().int().min(1).max(1440),
+  enabled: z.boolean(),
+});
+
+const backupSchema = z.object({
+  version: z.number().int().min(1),
+  exportedAt: z.string(),
+  apiKeys: z.array(apiKeySchema).optional(),
+  monitorConfigs: z.array(monitorConfigSchema).optional(),
+  appSettings: z.array(z.object({ key: z.string().max(100), value: z.string().max(4000) })).optional(),
+});
+
+type BackupData = z.infer<typeof backupSchema>;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -59,13 +66,17 @@ export async function POST(req: NextRequest) {
   let data: BackupData;
   try {
     const json = decrypt(encryptedPayload.trim());
-    data = JSON.parse(json);
+    const parsed = backupSchema.safeParse(JSON.parse(json));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid backup format" }, { status: 400 });
+    }
+    data = parsed.data;
   } catch {
     return NextResponse.json({ error: "Failed to decrypt backup — wrong encryption key or corrupted file" }, { status: 400 });
   }
 
-  if (!data.version || !data.apiKeys) {
-    return NextResponse.json({ error: "Invalid backup format" }, { status: 400 });
+  if (!data.apiKeys?.length) {
+    return NextResponse.json({ error: "Backup contains no API keys" }, { status: 400 });
   }
 
   // Restore API keys (upsert by id)

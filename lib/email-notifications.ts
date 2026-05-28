@@ -2,6 +2,15 @@ import nodemailer from "nodemailer";
 import { db } from "./db";
 import { getAppName } from "./app-config";
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 async function logEmail(opts: {
   type: string;
   keyName?: string;
@@ -81,21 +90,21 @@ export async function sendEmailNotification(
 
 function baseHtml(title: string, rows: { label: string; value: string }[], footer?: string, appName = "API Monitor"): string {
   const rowsHtml = rows
-    .map((r) => `<tr><td style="padding:6px 12px;color:#8892a4;font-weight:600;white-space:nowrap">${r.label}</td><td style="padding:6px 12px;color:#e8eaf0">${r.value}</td></tr>`)
+    .map((r) => `<tr><td style="padding:6px 12px;color:#8892a4;font-weight:600;white-space:nowrap">${escapeHtml(r.label)}</td><td style="padding:6px 12px;color:#e8eaf0">${escapeHtml(r.value)}</td></tr>`)
     .join("");
   return `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:24px;background:#0d1018;font-family:system-ui,sans-serif">
   <div style="max-width:520px;margin:0 auto;background:#0f1117;border:1px solid #1e2535;border-radius:8px;overflow:hidden">
     <div style="background:#1a2130;padding:16px 20px;border-bottom:1px solid #1e2535">
-      <span style="color:#e8eaf0;font-size:15px;font-weight:700">${appName}</span>
+      <span style="color:#e8eaf0;font-size:15px;font-weight:700">${escapeHtml(appName)}</span>
     </div>
     <div style="padding:20px">
-      <h2 style="margin:0 0 16px;color:#e8eaf0;font-size:16px">${title}</h2>
+      <h2 style="margin:0 0 16px;color:#e8eaf0;font-size:16px">${escapeHtml(title)}</h2>
       <table style="border-collapse:collapse;width:100%;background:#0d1018;border:1px solid #1e2535;border-radius:6px;overflow:hidden">
         ${rowsHtml}
       </table>
-      ${footer ? `<p style="margin:16px 0 0;color:#4a5568;font-size:12px">${footer}</p>` : ""}
+      ${footer ? `<p style="margin:16px 0 0;color:#4a5568;font-size:12px">${escapeHtml(footer)}</p>` : ""}
     </div>
   </div>
 </body>
