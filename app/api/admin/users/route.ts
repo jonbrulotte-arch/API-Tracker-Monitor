@@ -12,9 +12,14 @@ export async function GET() {
   }
 
   const users = await db.user.findMany({
-    select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
+    select: {
+      id: true, name: true, email: true, role: true, status: true, createdAt: true,
+      _count: { select: { apiKeys: true } },
+    },
     orderBy: { createdAt: "asc" },
   });
 
-  return NextResponse.json(users);
+  return NextResponse.json(
+    users.map((u) => ({ ...u, keyCount: u._count.apiKeys, _count: undefined }))
+  );
 }

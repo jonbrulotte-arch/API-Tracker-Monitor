@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Check, Ban, ChevronDown, Pencil, X } from "lucide-react";
+import { Users, Check, Ban, ChevronDown, Pencil, X, ArrowRightLeft } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 interface TeamUser {
@@ -14,6 +14,7 @@ interface TeamUser {
   role: string;
   status: string;
   createdAt: string;
+  keyCount: number;
 }
 
 interface TeamSettingsProps {
@@ -40,6 +41,10 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [reassigning, setReassigning] = useState<string | null>(null);
+  const [reassignTo, setReassignTo] = useState("");
+  const [reassignLoading, setReassignLoading] = useState(false);
+  const [reassignStatus, setReassignStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const isAdmin = currentUserRole === "ADMIN";
 
@@ -79,6 +84,34 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
     setEditing(null);
   };
 
+  const openReassign = (userId: string) => {
+    setReassigning(userId);
+    setReassignTo("");
+    setReassignStatus(null);
+  };
+
+  const handleReassign = async (fromUserId: string) => {
+    if (!reassignTo) return;
+    setReassignLoading(true);
+    setReassignStatus(null);
+    try {
+      const res = await fetch(`/api/admin/users/${fromUserId}/reassign-keys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toUserId: reassignTo }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReassignStatus({ type: "success", message: `${data.count} key${data.count !== 1 ? "s" : ""} reassigned.` });
+        await fetchUsers();
+      } else {
+        setReassignStatus({ type: "error", message: data.error ?? "Reassignment failed." });
+      }
+    } finally {
+      setReassignLoading(false);
+    }
+  };
+
   const pendingCount = users.filter((u) => u.status === "PENDING").length;
 
   return (
@@ -102,6 +135,8 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
             const canModify = !isSelf && (
               isAdmin || (currentUserRole === "SUB_ADMIN" && u.role === "MEMBER")
             );
+            const isReassigning = reassigning === u.id;
+            const activeOtherUsers = users.filter((x) => x.id !== u.id && x.status === "ACTIVE");
 
             return (
               <div key={u.id} className="py-3 space-y-2">
@@ -128,58 +163,113 @@ export function TeamSettings({ currentUserId, currentUserRole }: TeamSettingsPro
                     </Button>
                   </div>
                 ) : null}
+
                 <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm text-[#e8eaf0] truncate">{u.name ?? u.email}</p>
-                    {isSelf && <span className="text-[10px] text-[#4a5568]">(you)</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm text-[#e8eaf0] truncate">{u.name ?? u.email}</p>
+                      {isSelf && <span className="text-[10px] text-[#4a5568]">(you)</span>}
+                    </div>
+                    {u.name && <p className="text-xs text-[#4a5568] truncate">{u.email}</p>}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[11px] text-[#4a5568]">Joined {formatDate(new Date(u.createdAt))}</p>
+                      {u.keyCount > 0 && (
+                        <span className="text-[11px] text-[#4a5568]">· {u.keyCount} key{u.keyCount !== 1 ? "s" : ""}</span>
+                      )}
+                    </div>
                   </div>
-                  {u.name && <p className="text-xs text-[#4a5568] truncate">{u.email}</p>}
-                  <p className="text-[11px] text-[#4a5568]">Joined {formatDate(new Date(u.createdAt))}</p>
+
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                    <Badge variant={STATUS_VARIANTS[u.status] ?? "muted"} className="text-[10px]">
+                      {u.status}
+                    </Badge>
+                    <Badge variant={ROLE_VARIANTS[u.role] ?? "muted"} className="text-[10px]">
+                      {u.role}
+                    </Badge>
+
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {isAdmin && editing !== u.id && (
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(u)} title="Edit name/email">
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {isAdmin && !isSelf && u.keyCount > 0 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => isReassigning ? setReassigning(null) : openReassign(u.id)}
+                          title="Reassign keys to another team member"
+                        >
+                          <ArrowRightLeft className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {canModify && (
+                        <>
+                          {u.status === "PENDING" && (
+                            <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "ACTIVE" })}>
+                              <Check className="h-3.5 w-3.5 text-green-400" />
+                              <span className="text-xs">Approve</span>
+                            </Button>
+                          )}
+                          {u.status === "ACTIVE" && (
+                            <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "DISABLED" })}>
+                              <Ban className="h-3.5 w-3.5 text-red-400" />
+                              <span className="text-xs">Disable</span>
+                            </Button>
+                          )}
+                          {u.status === "DISABLED" && (
+                            <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "ACTIVE" })}>
+                              <Check className="h-3.5 w-3.5 text-green-400" />
+                              <span className="text-xs">Enable</span>
+                            </Button>
+                          )}
+                          {isAdmin && u.role !== "ADMIN" && (
+                            <RoleMenu currentRole={u.role} onSelect={(role) => update(u.id, { role })} disabled={updating === u.id} />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                  <Badge variant={STATUS_VARIANTS[u.status] ?? "muted"} className="text-[10px]">
-                    {u.status}
-                  </Badge>
-                  <Badge variant={ROLE_VARIANTS[u.role] ?? "muted"} className="text-[10px]">
-                    {u.role}
-                  </Badge>
-
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {isAdmin && editing !== u.id && (
-                      <Button size="sm" variant="ghost" onClick={() => startEdit(u)} title="Edit name/email">
-                        <Pencil className="h-3 w-3" />
+                {/* Inline reassignment panel */}
+                {isReassigning && (
+                  <div className="ml-0 mt-1 rounded-md border border-[#2a3447] bg-[#0d1018] p-3 space-y-2">
+                    <p className="text-xs text-[#8892a4]">
+                      Transfer all {u.keyCount} key{u.keyCount !== 1 ? "s" : ""} owned by <span className="text-[#e8eaf0]">{u.name ?? u.email}</span> to:
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        value={reassignTo}
+                        onChange={(e) => setReassignTo(e.target.value)}
+                        className="h-8 rounded-md border border-[#2a3447] bg-[#0f1117] px-2 text-xs text-[#e8eaf0] focus:outline-none focus:ring-1 focus:ring-blue-500 flex-1 min-w-[160px]"
+                      >
+                        <option value="">Select new owner…</option>
+                        {activeOtherUsers.map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.name ?? x.email}{x.name ? ` (${x.email})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        loading={reassignLoading}
+                        disabled={!reassignTo}
+                        onClick={() => handleReassign(u.id)}
+                      >
+                        Transfer
                       </Button>
-                    )}
-                    {canModify && (
-                      <>
-                        {u.status === "PENDING" && (
-                          <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "ACTIVE" })}>
-                            <Check className="h-3.5 w-3.5 text-green-400" />
-                            <span className="text-xs">Approve</span>
-                          </Button>
-                        )}
-                        {u.status === "ACTIVE" && (
-                          <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "DISABLED" })}>
-                            <Ban className="h-3.5 w-3.5 text-red-400" />
-                            <span className="text-xs">Disable</span>
-                          </Button>
-                        )}
-                        {u.status === "DISABLED" && (
-                          <Button size="sm" variant="secondary" loading={updating === u.id} onClick={() => update(u.id, { status: "ACTIVE" })}>
-                            <Check className="h-3.5 w-3.5 text-green-400" />
-                            <span className="text-xs">Enable</span>
-                          </Button>
-                        )}
-                        {isAdmin && u.role !== "ADMIN" && (
-                          <RoleMenu currentRole={u.role} onSelect={(role) => update(u.id, { role })} disabled={updating === u.id} />
-                        )}
-                      </>
+                      <Button size="sm" variant="ghost" onClick={() => setReassigning(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                    {reassignStatus && (
+                      <p className={`text-xs ${reassignStatus.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                        {reassignStatus.message}
+                      </p>
                     )}
                   </div>
-                </div>
-                </div>
+                )}
               </div>
             );
           })}

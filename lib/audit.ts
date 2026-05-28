@@ -1,8 +1,8 @@
 import { db } from "./db";
 
 interface AuditEntry {
-  action: "created" | "updated" | "deleted" | "revealed" | "copied";
-  entityType: "api_key" | "monitor";
+  action: "created" | "updated" | "deleted" | "revealed" | "copied" | "reassigned";
+  entityType: "api_key" | "monitor" | "user";
   entityId: string;
   entityName: string;
   provider?: string;
