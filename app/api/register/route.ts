@@ -34,6 +34,14 @@ export async function POST(req: NextRequest) {
 
   const existingUsers = await db.user.count();
   const isFirst = existingUsers === 0;
+
+  // Enforce registration-closed setting (never block the very first admin)
+  if (!isFirst) {
+    const allowReg = await db.appSetting.findUnique({ where: { key: "allow_registration" } });
+    if (allowReg?.value === "false") {
+      return NextResponse.json({ error: "Registration is currently closed." }, { status: 403 });
+    }
+  }
   const role = isFirst ? "ADMIN" : "MEMBER";
   const status = isFirst ? "ACTIVE" : "PENDING";
 

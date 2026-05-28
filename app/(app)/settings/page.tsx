@@ -11,7 +11,9 @@ import { ProfileSettings } from "@/components/settings/profile-settings";
 import { AppNameSettings } from "@/components/settings/app-name-settings";
 import { AdminTokenSettings } from "@/components/settings/admin-token-settings";
 import { NotificationSettings } from "@/components/settings/notification-settings";
+import { RegistrationSettings } from "@/components/settings/registration-settings";
 import { getAppName } from "@/lib/app-config";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,11 @@ export default async function SettingsPage() {
   const role = session?.user?.role ?? "MEMBER";
   const isAdmin = role === "ADMIN";
   const isAdminOrSub = isAdmin || role === "SUB_ADMIN";
-  const appName = isAdmin ? await getAppName() : "API Monitor";
+  const [appName, regSetting] = await Promise.all([
+    isAdmin ? getAppName() : Promise.resolve("API Monitor"),
+    isAdmin ? db.appSetting.findUnique({ where: { key: "allow_registration" } }) : Promise.resolve(null),
+  ]);
+  const allowRegistration = regSetting?.value !== "false";
 
   return (
     <div className="flex flex-col flex-1">
@@ -40,6 +46,9 @@ export default async function SettingsPage() {
 
         {/* App name — admin only */}
         {isAdmin && <AppNameSettings initialName={appName} />}
+
+        {/* Registration toggle — admin only */}
+        {isAdmin && <RegistrationSettings initialAllowRegistration={allowRegistration} />}
 
         {/* All team access tokens — admin only */}
         {isAdmin && <AdminTokenSettings />}
