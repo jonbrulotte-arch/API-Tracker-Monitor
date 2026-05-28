@@ -11,7 +11,9 @@ import { getExpiryStatus } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  await auth();
+  const session = await auth();
+  const currentUserId = session?.user?.id ?? "";
+  const currentUserRole = session?.user?.role ?? "MEMBER";
 
   const keys = await db.apiKey.findMany({
     include: {
@@ -57,7 +59,7 @@ export default async function DashboardPage() {
         />
         <div>
           <h2 className="text-sm font-semibold text-[#e8eaf0] mb-3">All API Keys</h2>
-          <KeysTable keys={keys} />
+          <KeysTable keys={keys} currentUserId={currentUserId} currentUserRole={currentUserRole} />
         </div>
       </div>
     </div>

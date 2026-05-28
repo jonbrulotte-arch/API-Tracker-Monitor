@@ -12,6 +12,7 @@ import { formatMs } from "@/lib/utils";
 
 interface MonitorConfigFormProps {
   keyId: string;
+  canWrite?: boolean;
   config?: {
     endpoint: string;
     method: string;
@@ -24,7 +25,7 @@ interface MonitorConfigFormProps {
   } | null;
 }
 
-export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
+export function MonitorConfigForm({ keyId, config, canWrite = true }: MonitorConfigFormProps) {
   const router = useRouter();
   const [endpoint, setEndpoint] = useState(config?.endpoint ?? "");
   const [method, setMethod] = useState(config?.method ?? "GET");
@@ -98,6 +99,12 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
+      {!canWrite && (
+        <div className="rounded-md bg-[#1e2535] border border-[#2a3447] px-3 py-2 text-xs text-[#8892a4]">
+          Read-only — only the key owner or an admin can modify this monitor.
+        </div>
+      )}
+
       {error && (
         <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
           {error}
@@ -111,10 +118,11 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
           value={endpoint}
           onChange={(e) => setEndpoint(e.target.value)}
           required
+          disabled={!canWrite}
           className="col-span-2"
         />
 
-        <Select label="HTTP Method" value={method} onChange={(e) => setMethod(e.target.value)}>
+        <Select label="HTTP Method" value={method} onChange={(e) => setMethod(e.target.value)} disabled={!canWrite}>
           {["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"].map((m) => (
             <option key={m} value={m}>{m}</option>
           ))}
@@ -127,12 +135,14 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
           max={599}
           value={expectedStatus}
           onChange={(e) => setExpectedStatus(Number(e.target.value))}
+          disabled={!canWrite}
         />
 
         <Select
           label="Key Injection"
           value={injectionType}
           onChange={(e) => setInjectionType(e.target.value)}
+          disabled={!canWrite}
         >
           <option value="header">HTTP Header</option>
           <option value="query">Query Parameter</option>
@@ -146,6 +156,7 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
           value={injectionKey}
           onChange={(e) => setInjectionKey(e.target.value)}
           required
+          disabled={!canWrite}
         />
       </div>
 
@@ -156,6 +167,7 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
           value={injectionFormat}
           onChange={(e) => setInjectionFormat(e.target.value)}
           hint={injectionHints[injectionType]}
+          disabled={!canWrite}
         />
       )}
 
@@ -168,6 +180,7 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
           label="Check Interval"
           value={intervalMinutes}
           onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+          disabled={!canWrite}
         >
           <option value={1}>Every 1 minute</option>
           <option value={5}>Every 5 minutes</option>
@@ -183,10 +196,11 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
           <label className="text-sm font-medium text-[#c8cdd6]">Enabled</label>
           <button
             type="button"
-            onClick={() => setEnabled(!enabled)}
+            onClick={() => canWrite && setEnabled(!enabled)}
+            disabled={!canWrite}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               enabled ? "bg-blue-600" : "bg-[#2a3447]"
-            }`}
+            } ${!canWrite ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -215,13 +229,15 @@ export function MonitorConfigForm({ keyId, config }: MonitorConfigFormProps) {
       )}
 
       <div className="flex items-center gap-2 pt-1">
-        <Button type="submit" loading={saving}>
-          <Save className="h-3.5 w-3.5" /> Save Config
-        </Button>
+        {canWrite && (
+          <Button type="submit" loading={saving}>
+            <Save className="h-3.5 w-3.5" /> Save Config
+          </Button>
+        )}
         <Button type="button" variant="secondary" loading={testing} onClick={handleTest}>
           <PlayCircle className="h-3.5 w-3.5" /> Test Now
         </Button>
-        {config && (
+        {canWrite && config && (
           <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
             <Trash2 className="h-3.5 w-3.5" /> Remove Monitor
           </Button>

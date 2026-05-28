@@ -1,3 +1,4 @@
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Topbar } from "@/components/layout/topbar";
 import { KeysTable } from "@/components/keys/keys-table";
@@ -8,6 +9,10 @@ import { Plus } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function KeysPage() {
+  const session = await auth();
+  const currentUserId = session?.user?.id ?? "";
+  const currentUserRole = session?.user?.role ?? "MEMBER";
+
   const keys = await db.apiKey.findMany({
     include: {
       createdBy: { select: { id: true, name: true, email: true } },
@@ -31,7 +36,7 @@ export default async function KeysPage() {
         }
       />
       <div className="flex-1 p-6">
-        <KeysTable keys={keys} />
+        <KeysTable keys={keys} currentUserId={currentUserId} currentUserRole={currentUserRole} />
       </div>
     </div>
   );

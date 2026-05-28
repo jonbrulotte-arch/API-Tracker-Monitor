@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Topbar } from "@/components/layout/topbar";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,10 @@ export const dynamic = "force-dynamic";
 
 export default async function KeyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await auth();
+  const currentUserId = session?.user?.id ?? "";
+  const currentUserRole = session?.user?.role ?? "MEMBER";
+
   const key = await db.apiKey.findUnique({
     where: { id },
     include: {
@@ -24,6 +29,9 @@ export default async function KeyDetailPage({ params }: { params: Promise<{ id: 
   });
 
   if (!key) notFound();
+
+  const isPrivileged = currentUserRole === "ADMIN" || currentUserRole === "SUB_ADMIN";
+  const canWrite = isPrivileged || key.createdById === currentUserId;
 
   const expiryStatus = getExpiryStatus(key.expiresAt);
   const tags: string[] = JSON.parse(key.tags);
@@ -50,11 +58,13 @@ export default async function KeyDetailPage({ params }: { params: Promise<{ id: 
         title={key.name}
         description={key.provider}
         actions={
-          <Link href={`/keys/${id}/edit`}>
-            <Button size="sm" variant="secondary">
-              <Edit className="h-3.5 w-3.5" /> Edit Key
-            </Button>
-          </Link>
+          canWrite ? (
+            <Link href={`/keys/${id}/edit`}>
+              <Button size="sm" variant="secondary">
+                <Edit className="h-3.5 w-3.5" /> Edit Key
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
       <div className="flex-1 p-6 space-y-5">
@@ -103,7 +113,7 @@ export default async function KeyDetailPage({ params }: { params: Promise<{ id: 
                 </a>
               )}
             </CardHeader>
-            <MonitorConfigForm keyId={id} config={key.monitorConfig} />
+            <MonitorConfigForm keyId={id} config={key.monitorConfig} canWrite={canWrite} />
           </Card>
 
           {/* Uptime chart */}

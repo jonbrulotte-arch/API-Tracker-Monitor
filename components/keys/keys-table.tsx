@@ -11,6 +11,8 @@ import type { ApiKeyWithRelations } from "@/types";
 
 interface KeysTableProps {
   keys: ApiKeyWithRelations[];
+  currentUserId: string;
+  currentUserRole: string;
 }
 
 const expiryBadge = (key: ApiKeyWithRelations) => {
@@ -32,7 +34,8 @@ const monitorBadge = (key: ApiKeyWithRelations) => {
   return <Badge variant="danger" dot>Failing</Badge>;
 };
 
-export function KeysTable({ keys }: KeysTableProps) {
+export function KeysTable({ keys, currentUserId, currentUserRole }: KeysTableProps) {
+  const isPrivileged = currentUserRole === "ADMIN" || currentUserRole === "SUB_ADMIN";
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<"name" | "provider" | "expiresAt" | "createdAt">("createdAt");
@@ -123,6 +126,7 @@ export function KeysTable({ keys }: KeysTableProps) {
             {sorted.map((key) => {
               const tags: string[] = JSON.parse(key.tags);
               const latestResult = key.monitorResults[0];
+              const canWrite = isPrivileged || key.createdById === currentUserId;
               return (
                 <tr
                   key={key.id}
@@ -156,20 +160,24 @@ export function KeysTable({ keys }: KeysTableProps) {
                           <Activity className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
-                      <Link href={`/keys/${key.id}/edit`}>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                          <Edit className="h-3.5 w-3.5" />
+                      {canWrite && (
+                        <Link href={`/keys/${key.id}/edit`}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                        </Link>
+                      )}
+                      {canWrite && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 hover:text-red-400"
+                          loading={deleting === key.id}
+                          onClick={() => handleDelete(key.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 hover:text-red-400"
-                        loading={deleting === key.id}
-                        onClick={() => handleDelete(key.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
