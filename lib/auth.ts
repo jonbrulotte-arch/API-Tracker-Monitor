@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { z } from "zod";
+import { checkRateLimit } from "./rate-limit";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -35,6 +36,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
+
+        // 10 attempts per email per 15 minutes
+        if (!checkRateLimit(`login:${parsed.data.email.toLowerCase()}`, 10, 15 * 60_000)) {
+          return null;
+        }
 
         const user = await db.user.findUnique({
           where: { email: parsed.data.email },

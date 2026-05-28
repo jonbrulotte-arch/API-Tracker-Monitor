@@ -10,8 +10,14 @@ async function getMaxBackups(): Promise<number> {
   return Number(s?.value ?? 10);
 }
 
+const SENSITIVE_SETTING_KEYS = new Set([
+  "smtp_pass",
+  "slack_webhook_url",
+  "teams_webhook_url",
+]);
+
 async function collectData() {
-  const [keys, settings, monitors, users] = await Promise.all([
+  const [keys, allSettings, monitors, users] = await Promise.all([
     db.apiKey.findMany({
       select: {
         id: true, name: true, provider: true, encryptedValue: true,
@@ -25,6 +31,8 @@ async function collectData() {
       select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
     }),
   ]);
+
+  const settings = allSettings.filter((s) => !SENSITIVE_SETTING_KEYS.has(s.key));
 
   return {
     version: 1,
