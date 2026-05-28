@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("MEMBER")
+  status        String    @default("ACTIVE")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  apiKeys       ApiKey[]
+  accessTokens  AccessToken[]
+  backups       Backup[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  name           String
+  provider       String
+  encryptedValue String
+  expiresAt      DateTime?
+  tags           String    @default("[]")
+  notes          String?
+  status         String    @default("active")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdById    String
+
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  monitorConfig  MonitorConfig?
+  monitorResults MonitorResult[]
+}
+
+model MonitorConfig {
+  id              String    @id @default(cuid())
+  apiKeyId        String    @unique
+  endpoint        String
+  method          String    @default("GET")
+  injectionType   String    @default("header")
+  injectionKey    String    @default("Authorization")
+  injectionFormat String?
+  expectedStatus  Int       @default(200)
+  intervalMinutes Int       @default(15)
+  enabled         Boolean   @default(true)
+  lastCheckedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+}
+
+model MonitorResult {
+  id           String   @id @default(cuid())
+  apiKeyId     String
+  checkedAt    DateTime @default(now())
+  ok           Boolean
+  statusCode   Int?
+  responseMs   Int?
+  errorMessage String?
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, checkedAt])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model ApiLog {
+  id           String   @id @default(cuid())
+  method       String
+  path         String
+  tokenPrefix  String?
+  tokenName    String?
+  statusCode   Int
+  responseMs   Int
+  keyName      String?
+  ipAddress    String?
+  requestedAt  DateTime @default(now())
+
+  @@index([requestedAt])
+  @@index([tokenPrefix])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  entityName String
+  provider   String?
+  userId     String
+  userEmail  String
+  userName   String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityId])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model SlackLog {
+  id        String   @id @default(cuid())
+  type      String
+  keyName   String?
+  provider  String?
+  message   String
+  success   Boolean
+  sentAt    DateTime @default(now())
+
+  @@index([sentAt])
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  channel   String   // slack | email | teams
+  type      String
+  keyName   String?
+  provider  String?
+  message   String
+  success   Boolean
+  error     String?
+  sentAt    DateTime @default(now())
+
+  @@index([sentAt])
+  @@index([channel])
+}
+
+model Backup {
+  id          String   @id @default(cuid())
+  filename    String
+  sizeBytes   Int
+  encrypted   Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy   User @relation(fields: [createdById], references: [id])
+  @@index([createdAt])
+}
+
+model AccessToken {
+  id          String    @id @default(cuid())
+  name        String
+  tokenHash   String    @unique
+  prefix      String
+  scopes      String    @default("read:keys")
+  userId      String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+}
